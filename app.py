@@ -12,23 +12,140 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 自定义CSS (为了让界面看起来更科幻/高端) ---
+# --- 自定义CSS (整体视觉与模块组件) ---
 st.markdown("""
 <style>
-    .reportview-container {
-        background: #0e1117;
-    }
-    .big-font {
-        font-size:30px !important;
-        font-weight: bold;
-        color: #4CAF50;
-    }
-    .metric-card {
-        background-color: #262730;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 5px solid #4CAF50;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=ZCOOL+XiaoWei&display=swap');
+
+:root {
+    --bg-0: #0b0f14;
+    --bg-1: #0f1720;
+    --bg-2: #121c28;
+    --glow-1: #61d9ff;
+    --glow-2: #7cffc4;
+    --accent: #f7d774;
+    --text-0: #e9f0f7;
+    --text-1: #a4b3c6;
+    --card: rgba(20, 30, 40, 0.62);
+    --stroke: rgba(136, 176, 206, 0.25);
+}
+
+* { font-family: 'Space Grotesk', 'ZCOOL XiaoWei', sans-serif; }
+
+.stApp {
+    background: radial-gradient(1200px 600px at 10% 10%, rgba(97, 217, 255, 0.08), transparent 60%),
+                radial-gradient(900px 500px at 90% 20%, rgba(124, 255, 196, 0.08), transparent 60%),
+                linear-gradient(160deg, var(--bg-0), var(--bg-1) 55%, var(--bg-2));
+    color: var(--text-0);
+}
+
+section.main > div { padding-top: 1.2rem; }
+
+.hero {
+    border: 1px solid var(--stroke);
+    border-radius: 24px;
+    padding: 28px 32px;
+    background: linear-gradient(120deg, rgba(16, 25, 36, 0.85), rgba(12, 20, 28, 0.72));
+    box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+}
+
+.hero h1 {
+    font-family: 'ZCOOL XiaoWei', serif;
+    letter-spacing: 1px;
+    font-size: 40px;
+    margin-bottom: 0.3rem;
+}
+
+.hero p { color: var(--text-1); font-size: 16px; }
+
+.badge {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--stroke);
+    background: rgba(15, 30, 40, 0.5);
+    color: var(--text-1);
+    font-size: 12px;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.stat {
+    background: var(--card);
+    border: 1px solid var(--stroke);
+    border-radius: 18px;
+    padding: 14px 16px;
+}
+
+.stat h3 { font-size: 20px; margin: 0 0 6px; }
+.stat span { color: var(--text-1); font-size: 12px; }
+
+.panel {
+    background: var(--card);
+    border: 1px solid var(--stroke);
+    border-radius: 20px;
+    padding: 18px 20px;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.glow {
+    color: var(--glow-2);
+    text-shadow: 0 0 12px rgba(124, 255, 196, 0.35);
+}
+
+.big-font {
+    font-size: 30px !important;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.stSidebar {
+    background: linear-gradient(180deg, rgba(10, 18, 26, 0.98), rgba(9, 14, 20, 0.92));
+    border-right: 1px solid rgba(136, 176, 206, 0.18);
+}
+
+.stSidebar .stRadio > label, .stSidebar .stSelectbox > label {
+    color: var(--text-1);
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: rgba(16, 26, 36, 0.55);
+    border: 1px solid var(--stroke);
+    border-radius: 999px;
+    color: var(--text-1);
+    padding: 8px 16px;
+}
+
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    color: var(--text-0);
+    border-color: rgba(124, 255, 196, 0.5);
+    box-shadow: 0 0 16px rgba(97, 217, 255, 0.2);
+}
+
+@media (max-width: 980px) {
+    .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+    .stat-grid { grid-template-columns: 1fr; }
+    .hero { padding: 22px; }
+    .hero h1 { font-size: 30px; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,16 +166,34 @@ st.sidebar.info("当前连接卫星：Sentinel-2L\n数据延迟：< 10ms")
 
 # --- 主界面逻辑 ---
 
-# 标题区
-st.title(f"🌍 {target_city} - 农业风土价值发现报告")
-st.markdown(f"天眼寻珍 (Terroir Hunter) 系统正在分析 {target_province} 秦巴山区腹地数据...")
+# 头部视觉区
+st.markdown("""
+<div class="hero">
+    <div class="badge">Terroir Hunter • 卫星遥感 + IoT + AI</div>
+    <h1>天眼寻珍：农业资产发现引擎</h1>
+    <p>把“风土价值”看得见、算得清、说得出。当前分析区域已锁定秦巴山脉核心带。</p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="stat-grid">
+    <div class="stat"><h3>92%</h3><span>风土匹配度峰值</span></div>
+    <div class="stat"><h3>1.2k</h3><span>卫星样本像元</span></div>
+    <div class="stat"><h3>24h</h3><span>微气候监测窗口</span></div>
+    <div class="stat"><h3>40x</h3><span>亩产值提升潜力</span></div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown(f"<div class='section-title'>🌍 {target_city} · <span class='glow'>农业风土价值发现报告</span></div>", unsafe_allow_html=True)
+st.markdown(f"系统正在分析 {target_province} 秦巴山区腹地数据，输出从遥感到商业价值的全链路评估。")
 
 # ------------------------------------------------------------------
 # 模块一：天眼扫描 (卫星热力图)
 # 对应BP中的“第一级漏斗：低成本广域初筛”
 # ------------------------------------------------------------------
 if scan_mode == "广域光谱初筛 (卫星)":
-    st.header("1. 卫星光谱遥感扫描 (Sentinel-2 Data)")
+    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>1. 卫星光谱遥感扫描</div>", unsafe_allow_html=True)
     
     # 模拟一个进度条，增加演示时的紧张感
     if st.button("🚀 启动全域扫描"):
@@ -102,13 +237,15 @@ if scan_mode == "广域光谱初筛 (卫星)":
     ))
 
     st.caption("🔴 红色高亮区域：风土模型匹配度 > 95% (建议重点开发)")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------
 # 模块二：地面验身 (物联网数据)
 # 对应BP中的“第二级漏斗：地面验身”
 # ------------------------------------------------------------------
 elif scan_mode == "精准小气候分析 (IoT)":
-    st.header("2. 地面物联网实时监测 (Ground Truth)")
+    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>2. 地面物联网实时监测</div>", unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -131,13 +268,15 @@ elif scan_mode == "精准小气候分析 (IoT)":
     st.line_chart(chart_data)
     
     st.info("💡 结论：该地块昼夜温差大，非常有利于苹果/葡萄的糖分与花青素积累。")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------
 # 模块三：资产评估 (商业变现)
 # 对应BP中的“第三级漏斗：IP孵化”
 # ------------------------------------------------------------------
 elif scan_mode == "资产价值评估 (AI)":
-    st.header("3. 土地资产价值重塑报告 (AI Valuation)")
+    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>3. 土地资产价值重塑报告</div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1])
 
@@ -165,3 +304,4 @@ elif scan_mode == "资产价值评估 (AI)":
     st.markdown("---")
     st.markdown("### 📦 生成 IP 方案预览")
     st.image("https://images.unsplash.com/photo-1630563451961-ac2ff27676ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", caption="概念产品：云端之吻·高山野生苹果", width=400)
+    st.markdown("</div>", unsafe_allow_html=True)

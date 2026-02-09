@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Streamlit
+.streamlit/
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db
+.github/
+.github/**
+
+# Local data/artifacts
+similar_regions.csv
+similar_regions_map.html
+suitability_map.html
+phenology_matching_analysis.png
+
+# Temporary/working
+/tmpclaude-*/

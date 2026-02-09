@@ -1,8 +1,11 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import pydeck as pdk
 import time
+import runpy
+from pathlib import Path
 
 # --- 页面配置 (必须在第一行) ---
 st.set_page_config(
@@ -11,6 +14,26 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+ROOT_DIR = Path(__file__).resolve().parent
+OUTPUT_SUITABILITY_MAP = ROOT_DIR / "suitability_map.html"
+OUTPUT_SIMILARITY_MAP = ROOT_DIR / "similar_regions_map.html"
+OUTPUT_SIMILARITY_CSV = ROOT_DIR / "similar_regions.csv"
+OUTPUT_PHENOLOGY_PNG = ROOT_DIR / "phenology_matching_analysis.png"
+
+
+def run_ahp_analysis():
+    runpy.run_path(str(ROOT_DIR / "AHP.py"), run_name="__main__")
+
+
+def run_hybrid_matching():
+    runpy.run_path(str(ROOT_DIR / "Hybrid Phenology Matching.py"), run_name="__main__")
+
+
+if "ahp_done" not in st.session_state:
+    st.session_state.ahp_done = False
+if "hybrid_done" not in st.session_state:
+    st.session_state.hybrid_done = False
 
 # --- 自定义CSS (整体视觉与模块组件) ---
 st.markdown("""
@@ -239,6 +262,23 @@ if scan_mode == "广域光谱初筛 (卫星)":
     st.caption("🔴 红色高亮区域：风土模型匹配度 > 95% (建议重点开发)")
     st.markdown("</div>", unsafe_allow_html=True)
 
+    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>1.1 AHP 适宜性分析 (真实计算)</div>", unsafe_allow_html=True)
+    st.write("运行后会生成适宜性地图并在此处展示。")
+    if st.button("🧭 运行 AHP 适宜性分析"):
+        with st.spinner("正在计算适宜性指数，请稍候..."):
+            try:
+                run_ahp_analysis()
+                st.session_state.ahp_done = True
+                st.success("AHP 适宜性分析完成。")
+            except Exception as exc:
+                st.error(f"AHP 计算失败: {exc}")
+
+    if st.session_state.ahp_done and OUTPUT_SUITABILITY_MAP.exists():
+        components.html(OUTPUT_SUITABILITY_MAP.read_text(encoding="utf-8"), height=560, scrolling=True)
+        st.caption("🗺️ 适宜性地图已生成：高分区建议重点开发。")
+    st.markdown("</div>", unsafe_allow_html=True)
+
 # ------------------------------------------------------------------
 # 模块二：地面验身 (物联网数据)
 # 对应BP中的“第二级漏斗：地面验身”
@@ -304,4 +344,27 @@ elif scan_mode == "资产价值评估 (AI)":
     st.markdown("---")
     st.markdown("### 📦 生成 IP 方案预览")
     st.image("https://images.unsplash.com/photo-1630563451961-ac2ff27676ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", caption="概念产品：云端之吻·高山野生苹果", width=400)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='panel'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>3.1 物候匹配与相似产区检索 (真实计算)</div>", unsafe_allow_html=True)
+    st.write("运行后会生成相似产区地图、CSV 排名和对比图。")
+    if st.button("🧪 运行物候匹配"):
+        with st.spinner("正在进行物候匹配与相似区域检索..."):
+            try:
+                run_hybrid_matching()
+                st.session_state.hybrid_done = True
+                st.success("物候匹配完成。")
+            except Exception as exc:
+                st.error(f"物候匹配失败: {exc}")
+
+    if st.session_state.hybrid_done:
+        if OUTPUT_SIMILARITY_MAP.exists():
+            components.html(OUTPUT_SIMILARITY_MAP.read_text(encoding="utf-8"), height=560, scrolling=True)
+        if OUTPUT_SIMILARITY_CSV.exists():
+            st.subheader("📋 相似产区排名")
+            st.dataframe(pd.read_csv(OUTPUT_SIMILARITY_CSV))
+        if OUTPUT_PHENOLOGY_PNG.exists():
+            st.subheader("📈 物候曲线对比")
+            st.image(str(OUTPUT_PHENOLOGY_PNG), use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)

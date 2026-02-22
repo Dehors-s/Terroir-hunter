@@ -345,6 +345,19 @@ tgt_marks = best_match['landmarks']
 warped_tgt = best_match['warped']
 sim_score = best_match['similarity']
 
+# --- Export JSON for frontend ---
+import json
+json_output = {
+    "best_similarity": round(sim_score, 1),
+    "ref_curve": ref_smooth.tolist() if hasattr(ref_smooth, 'tolist') else list(ref_smooth),
+    "tgt_curve": tgt_smooth.tolist() if hasattr(tgt_smooth, 'tolist') else list(tgt_smooth),
+    "warped_curve": warped_tgt.tolist() if hasattr(warped_tgt, 'tolist') else list(warped_tgt),
+    "landmarks": {k: int(v) for k, v in tgt_marks.items()} # Ensure int for validation
+}
+with open('phenology_results.json', 'w') as f:
+    json.dump(json_output, f)
+print("✓ 结果已保存到 phenology_results.json")
+
 # ==========================================
 # 6. 结果可视化 (Visualization)
 # ==========================================

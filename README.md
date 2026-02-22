@@ -57,12 +57,80 @@ pip install -r requirements.txt
 
 ## 🚀 使用方法
 
-### 启动应用
+### 方式一：Streamlit 演示（历史入口）
 ```bash
 streamlit run app.py
 ```
 
 应用将自动在浏览器中打开（默认地址：http://localhost:8501）
+
+### 方式二：Web 主版本（推荐，FastAPI + 前端）
+
+> 推荐使用根目录脚本 `start_local.ps1` 启动。脚本会自动：
+> 1) 注入代理变量；2) 注入 GCP 项目；3) 预检 GEE；4) 通过后启动后端。
+
+在项目根目录执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_local.ps1 -ProjectId "terrior-hunter"
+```
+
+可选参数：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_local.ps1 -ProjectId "terrior-hunter" -ProxyUrl "http://127.0.0.1:7890"
+```
+
+浏览器访问：
+
+- http://127.0.0.1:8000
+
+## 🌐 Web 版本说明 (FastAPI + 前端)
+
+本版本提供独立网页界面与后端 API，可部署到阿里云 ECS 或本地运行。
+
+### 直接启动后端（手动方式）
+
+```bash
+uvicorn server.main:app --host 0.0.0.0 --port 8000
+```
+
+或：
+
+```bash
+python server/main.py
+```
+
+### 访问前端
+
+浏览器打开：http://localhost:8000
+
+### 功能说明
+
+- **AHP 适宜性分析**：触发 AHP.py 生成 suitability_map.html
+- **Hybrid 物候匹配**：触发 Hybrid Phenology Matching.py 生成地图、CSV、曲线图
+
+## ☁️ 阿里云 ECS 部署简要
+
+1. 安装依赖并启动服务
+   ```bash
+   pip install -r requirements.txt
+   uvicorn server.main:app --host 0.0.0.0 --port 8000
+   ```
+2. Nginx 反向代理 (示例)
+   ```nginx
+   server {
+       listen 80;
+       server_name your-domain-or-ip;
+
+       location / {
+           proxy_pass http://127.0.0.1:8000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       }
+   }
+   ```
 
 ### 操作流程
 
@@ -84,9 +152,12 @@ streamlit run app.py
 
 ```
 三创赛/
-├── app.py              # 主应用文件
-├── requirements.txt    # Python依赖列表
-└── README.md          # 项目说明文档
+├── app.py                  # Streamlit 演示入口
+├── start_local.ps1         # 本地一键启动（代理 + GEE预检 + 后端启动）
+├── frontend/               # 前端页面与脚本
+├── server/                 # FastAPI 后端
+├── requirements.txt        # Python依赖列表
+└── README.md               # 项目说明文档
 ```
 
 ## 🎯 应用场景
@@ -125,10 +196,13 @@ streamlit run app.py
 
 ## 📊 演示数据说明
 
-当前版本使用模拟数据进行演示。实际部署时需要：
-- 接入真实卫星影像数据源
-- 部署物联网传感器网络
-- 对接AI风土分析模型
+当前 Web 主版本已支持真实 GEE 数据。
+
+- 物候提取与匹配默认采用严格真实数据模式：真实数据不可用时直接报错，不回退模拟。
+- 若出现 `Earth Engine ... no project found` 或 `assets not found`，请检查：
+    1) `GCP_PROJECT_ID` 是否设置为可用项目；
+    2) 该项目是否已开通 Earth Engine API 与资产空间；
+    3) 启动后端的同一终端会话是否设置了代理（如 `HTTP_PROXY/HTTPS_PROXY`）。
 
 ## 📄 许可证
 
@@ -140,4 +214,4 @@ streamlit run app.py
 
 ---
 
-**注意**: 本系统目前处于演示阶段，使用模拟数据展示功能。商业部署需要接入真实数据源。
+**注意**: 本系统仍处于迭代阶段。若使用 Web 主版本进行分析，建议始终通过 `start_local.ps1` 启动，以保证项目与代理配置一致。

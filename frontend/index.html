@@ -1,0 +1,4147 @@
+﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>天眼寻珍 | Terroir Hunter - 核心控制台</title>
+
+    
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+
+
+
+    <script>
+
+        tailwind.config = {
+
+            theme: {
+
+                extend: {
+
+                    colors: {
+
+                        'tech-black': '#0f172a',
+
+                        'tech-green': '#10b981',
+
+                        'tech-gold': '#f59e0b',
+
+                        'glass-bg': 'rgba(15, 23, 42, 0.7)',
+
+                        'glass-border': 'rgba(255, 255, 255, 0.1)',
+
+                        'neon-green': '#00FF00',
+
+                        'dark-bg': '#0D0D0D',
+
+                    },
+
+                    fontFamily: {
+
+                        mono: ['Fira Code', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+
+                        sans: ['Noto Sans SC', 'Fira Sans', 'PingFang SC', 'Microsoft YaHei', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+
+                    },
+
+                    animation: {
+
+                        'radar-scan': 'radar-scan 3s infinite ease-out',
+
+                        'pulse-green': 'pulse-green 2s infinite',
+
+                        'glitch': 'glitch 0.3s ease-in-out',
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    </script>
+
+    <style>
+
+        /* CSS变量定义 */
+
+        :root {
+
+            --glass-bg: rgba(15, 23, 42, 0.7);
+
+            --glass-border: rgba(255, 255, 255, 0.1);
+
+            --tech-green: #10b981;
+
+        }
+
+        html, body {
+            font-family: 'Noto Sans SC', 'Fira Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            line-height: 1.55;
+            letter-spacing: 0.01em;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-variant-numeric: tabular-nums;
+        }
+
+        h1, h2, h3, h4 {
+            letter-spacing: 0.02em;
+            line-height: 1.35;
+        }
+
+        button, input, select, textarea {
+            font-family: inherit;
+            letter-spacing: 0.01em;
+        }
+
+        .text-xs {
+            line-height: 1.45;
+        }
+
+        .text-sm {
+            line-height: 1.5;
+        }
+
+        
+
+        /* 玻璃拟态效果增强 */
+
+        .glass-panel {
+
+            background: var(--glass-bg);
+
+            backdrop-filter: blur(16px);
+
+            -webkit-backdrop-filter: blur(16px);
+
+            border: 1px solid var(--glass-border);
+
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(16, 185, 129, 0.1);
+
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+        }
+
+        body.phenology-zoom-lock {
+            overflow: hidden;
+        }
+
+        .phenology-chart-expandable {
+            position: relative;
+            cursor: zoom-in;
+            transition: all 0.25s ease;
+            overflow: hidden;
+        }
+
+        .phenology-zoom-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            z-index: 29998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .phenology-zoom-backdrop.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .phenology-chart-expandable::after {
+            content: '双击放大';
+            position: absolute;
+            right: 10px;
+            top: 8px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.55);
+            pointer-events: none;
+        }
+
+        .phenology-chart-expandable.is-zoomed {
+            position: fixed;
+            inset: 4vh 3vw 4vh 3vw;
+            width: auto;
+            height: auto !important;
+            z-index: 30000;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            background: rgba(9, 14, 24, 0.96);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
+            cursor: zoom-out;
+            padding-top: 28px;
+        }
+
+        .phenology-chart-expandable.is-zoomed::after {
+            content: '双击还原';
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.82);
+            top: 10px;
+            right: 14px;
+        }
+
+        .phenology-chart-expandable canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .phenology-zoom-close {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            width: 22px;
+            height: 22px;
+            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.25);
+            font-size: 12px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+            display: none;
+            z-index: 2;
+        }
+
+        .phenology-chart-expandable.is-zoomed .phenology-zoom-close {
+            display: block;
+        }
+
+        
+
+        
+
+
+
+        /* 扫描雷达动画增强 */
+
+        @keyframes radar-scan {
+
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; border-width: 2px; box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
+
+            50% { opacity: 0.4; box-shadow: 0 0 40px rgba(16, 185, 129, 0.4); }
+
+            100% { transform: translate(-50%, -50%) scale(4); opacity: 0; border-width: 0px; box-shadow: 0 0 0 rgba(16, 185, 129, 0); }
+
+        }
+
+        .scan-effect {
+
+            position: absolute;
+
+            top: 50%;
+
+            left: 50%;
+
+            width: 100px;
+
+            height: 100px;
+
+            border: 2px solid #10b981;
+
+            border-radius: 50%;
+
+            transform: translate(-50%, -50%);
+
+            animation: radar-scan 3s infinite ease-out;
+
+            pointer-events: none;
+
+            z-index: 400;
+
+            display: none; /* 默认隐藏 */
+
+        }
+
+
+
+        /* 呼吸灯效果增强 */
+
+        @keyframes pulse-green {
+
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7), 0 0 0 0 rgba(0, 255, 0, 0.4); }
+
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0), 0 0 0 20px rgba(0, 255, 0, 0); }
+
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0), 0 0 0 0 rgba(0, 255, 0, 0); }
+
+        }
+
+        .status-dot {
+
+            animation: pulse-green 2s infinite;
+
+        }
+
+
+
+        /* 故障效果 */
+
+        @keyframes glitch {
+
+            0% { transform: skew(0deg); }
+
+            25% { transform: skew(2deg); }
+
+            75% { transform: skew(-2deg); }
+
+            100% { transform: skew(0deg); }
+
+        }
+
+        .glitch-effect {
+
+            animation: glitch 0.3s ease-in-out;
+
+        }
+
+
+
+        /* 扫描线效果 */
+
+        #map::before {
+
+            content: '';
+
+            position: absolute;
+
+            top: 0;
+
+            left: 0;
+
+            right: 0;
+
+            bottom: 0;
+
+            background: repeating-linear-gradient(
+
+                to bottom,
+
+                transparent 0px,
+
+                rgba(16, 185, 129, 0.03) 1px,
+
+                transparent 2px
+
+            );
+
+            pointer-events: none;
+
+            z-index: 100;
+
+        }
+
+
+
+        /* 数字跳动动画 */
+
+        @keyframes count-up {
+
+            from { opacity: 0; transform: translateY(10px); }
+
+            to { opacity: 1; transform: translateY(0); }
+
+        }
+
+        .count-up {
+
+            animation: count-up 0.5s ease-out;
+
+        }
+
+        
+
+        /* 模块切换动画 */
+
+        @keyframes fade-in {
+
+            from { opacity: 0; transform: translateY(20px); }
+
+            to { opacity: 1; transform: translateY(0); }
+
+        }
+
+        .module-content {
+
+            animation: fade-in 0.5s ease-out;
+
+        }
+
+        
+
+        /* 导航项动画 */
+
+        .nav-item {
+
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+        }
+
+        
+
+        /* 标签页激活状态 */
+
+        .tab-active {
+
+            color: white !important;
+
+            border-bottom: 2px solid var(--tech-green);
+
+            font-weight: 500;
+
+        }
+
+        
+
+        /* 卡片悬浮效果增强 */
+
+        .glass-panel:hover {
+
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(16, 185, 129, 0.2);
+
+            transform: translateY(-2px) scale(1.01);
+
+        }
+
+
+
+        /* 按钮效果增强 */
+
+        .btn-primary {
+
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+            position: relative;
+
+            overflow: hidden;
+
+        }
+
+        
+
+        .btn-primary::before {
+
+            content: '';
+
+            position: absolute;
+
+            top: -50%;
+
+            left: -50%;
+
+            width: 200%;
+
+            height: 200%;
+
+            background: linear-gradient(
+
+                to right,
+
+                transparent,
+
+                rgba(255, 255, 255, 0.2),
+
+                transparent
+
+            );
+
+            transform: rotate(45deg);
+
+            animation: shine 3s infinite;
+
+        }
+
+        
+
+        @keyframes shine {
+
+            0% { transform: translateX(-100%) rotate(45deg); }
+
+            100% { transform: translateX(100%) rotate(45deg); }
+
+        }
+
+
+
+        /* 隐藏 Leaflet 版权信息以保持极简 */
+
+        .leaflet-control-attribution { display: none !important; }
+
+        
+
+        /* 响应式设计优化 */
+
+        @media (max-width: 768px) {
+
+            .glass-panel {
+
+                backdrop-filter: blur(12px);
+
+                -webkit-backdrop-filter: blur(12px);
+
+            }
+
+        }
+
+        
+
+        /* 减少动画偏好设置 */
+
+        @media (prefers-reduced-motion: reduce) {
+
+            * {
+
+                animation-duration: 0.01ms !important;
+
+                animation-iteration-count: 1 !important;
+
+                transition-duration: 0.01ms !important;
+
+            }
+
+        }
+
+        /* 滚动条样式优化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(16, 185, 129, 0.4);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(16, 185, 129, 0.7);
+        }
+    </style>
+
+</head>
+
+<body class="bg-tech-black text-white h-screen w-screen overflow-hidden relative font-sans">
+
+
+
+    <div id="map" class="absolute inset-0 z-0 opacity-80"></div>
+
+    <div id="suitability-heatmap-panel" class="absolute inset-6 z-20 hidden pointer-events-auto">
+        <div class="glass-panel w-full h-full rounded-2xl overflow-hidden border border-white/10 flex flex-col">
+            <div class="flex items-center justify-between px-4 py-2 bg-black/40">
+                <div class="text-sm text-gray-200 flex items-center gap-2">
+                    <i class="fa-solid fa-fire-flame-curved text-tech-green"></i>
+                    <span>适宜性热力图</span>
+                </div>
+                <button onclick="hideSuitabilityHeatmap()" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white transition">关闭</button>
+            </div>
+            <iframe id="suitability-heatmap-iframe" class="w-full flex-1" src="about:blank" style="border:0;"></iframe>
+        </div>
+    </div>
+
+    
+
+    <div id="radar-layer" class="scan-effect"></div>
+
+
+
+    <header class="absolute top-0 left-0 w-full z-10 p-6 flex justify-between items-start pointer-events-none">
+
+        <div class="glass-panel px-6 py-3 rounded-full pointer-events-auto flex items-center gap-3">
+
+            <i class="fa-solid fa-satellite text-tech-green text-xl"></i>
+
+            <div>
+
+                <h1 class="font-bold text-lg tracking-wider">TERROIR HUNTER <span class="text-xs text-gray-400 font-normal ml-2">V2.0 PRO</span></h1>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="glass-panel px-6 py-3 rounded-full pointer-events-auto flex items-center gap-6 text-sm font-mono">
+
+            <div class="flex items-center gap-2">
+
+                <div class="w-2 h-2 rounded-full bg-tech-green status-dot"></div>
+
+                <span class="text-tech-green">SATELLITE: ONLINE</span>
+
+            </div>
+
+            <div class="text-gray-400">|</div>
+
+            <div>
+
+                <i class="fa-regular fa-clock mr-2"></i>
+
+                <span id="clock">12:00:00</span>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+
+    <div class="absolute top-0 left-6 bottom-0 z-10 flex flex-col gap-4 w-16 md:w-64 overflow-y-auto pr-1 pb-4">
+
+        <!-- 侧边栏导航 -->
+
+        <div class="glass-panel p-4 rounded-2xl pointer-events-auto flex flex-col gap-4 mt-20">
+
+            <div class="flex items-center gap-3 mb-6">
+
+                <i class="fa-solid fa-bars text-tech-green text-xl"></i>
+
+                <span class="text-sm font-medium hidden md:block">导航菜单</span>
+
+            </div>
+
+            
+
+            <a href="#" onclick="switchModule('scan-console'); return false;" class="flex items-center gap-3 p-3 rounded-xl bg-tech-green/10 border border-tech-green/30 text-tech-green transition-all duration-300" id="nav-scan">
+
+                <i class="fa-solid fa-satellite text-lg"></i>
+
+                <span class="hidden md:block">天眼扫描控制台</span>
+
+            </a>
+
+            
+
+            <a href="#" onclick="switchModule('suitability-analysis'); return false;" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 text-gray-400 hover:text-white transition-all duration-300" id="nav-analysis">
+                <i class="fa-solid fa-leaf text-lg"></i>
+                <span class="hidden md:block">风土适宜性分析</span>
+            </a>
+            
+            <a href="#" onclick="switchModule('golden-standard'); return false;" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 text-gray-400 hover:text-white transition-all duration-300" id="nav-models">
+                <i class="fa-solid fa-earth-americas text-lg"></i>
+                <span class="hidden md:block">风土标尺库</span>
+            </a>
+        </div>
+
+        
+
+        <!-- 原有的目标选择面板 -->
+
+        <div class="glass-panel p-5 rounded-2xl pointer-events-auto hidden md:block">
+
+            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">Target Selection</h3>
+
+            
+
+            <div class="mb-4">
+                <label class="text-xs text-gray-500 block mb-1">REGION</label>
+                <div class="flex items-center justify-between text-sm font-medium border-b border-gray-700 pb-2">
+                    <span id="target-region-display">未选择区域</span>
+                    <i class="fa-solid fa-location-crosshairs text-tech-green"></i>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="text-xs text-gray-500 block mb-1">地名搜索</label>
+                <div class="flex gap-1 items-stretch">
+                    <input type="text" id="place-search-input" placeholder="输入地名" class="flex-1 bg-black/30 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+                    <button onclick="searchPlaceByName()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-3 py-1 rounded transition text-xs whitespace-nowrap">🔍</button>
+                </div>
+                <div id="place-search-results" class="hidden mt-2 bg-black/50 border border-gray-700 rounded-lg max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <div class="mb-6">
+                <label class="text-xs text-gray-500 block mb-1">CROP MODEL</label>
+                <input type="text" id="target-crop-name" placeholder="例如：富士苹果" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+            </div>
+
+
+
+            <button onclick="enableRegionSelection()" id="scan-btn" class="w-full bg-tech-green hover:bg-emerald-600 text-black font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-primary cursor-pointer">
+
+                <i class="fa-solid fa-location-crosshairs"></i>
+
+                <span>启用地图选区</span>
+
+            </button>
+
+        </div>
+
+
+
+        <div class="glass-panel p-4 rounded-2xl pointer-events-auto font-mono text-xs text-gray-400 hidden md:block">
+
+            <div class="flex justify-between mb-1">
+
+                <span>LAT:</span> <span id="scan-selected-lat" class="text-white">33.8704° N</span>
+
+            </div>
+
+            <div class="flex justify-between">
+
+                <span>LNG:</span> <span id="scan-selected-lng" class="text-white">109.9324° E</span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- 风土标尺库内容 -->
+    <div id="golden-standard" class="module-content hidden">
+        <div class="absolute top-20 left-24 md:left-72 right-6 bottom-6 z-10 overflow-hidden pointer-events-none">
+            <div class="h-full w-full rounded-2xl overflow-hidden flex pointer-events-none">
+                <div class="w-[60%] h-full relative border-r border-white/5 pointer-events-none">
+                    <div class="absolute top-4 left-4 right-4 z-10 flex gap-3 pointer-events-auto">
+                        <div class="glass-panel rounded-xl p-2 flex items-center gap-2 flex-1 max-w-md bg-transparent backdrop-blur-[8px] border border-white/10">
+                            <i class="fa-solid fa-search text-gray-400 ml-2"></i>
+                            <input type="text" id="gs-search-input" placeholder="输入经纬度或产区名（如：法国波尔多左岸）"
+                                   class="bg-transparent border-none outline-none text-sm text-white w-full placeholder-gray-500">
+                            <button id="gs-search-btn" class="bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-1 text-xs transition">定位</button>
+                        </div>
+                    </div>
+
+                    <div class="absolute top-20 left-4 z-10 pointer-events-auto">
+                        <div class="glass-panel text-xs text-gray-200 px-3 py-2 rounded-lg bg-transparent backdrop-blur-[8px] border border-white/10">
+                            使用主地图底图，点击地图任意位置放置采样探针
+                        </div>
+                    </div>
+
+                    <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 pointer-events-auto">
+                        <button id="gs-extract-btn" class="bg-tech-gold hover:bg-amber-400 text-black font-bold py-3 px-8 rounded-full shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fa-solid fa-dna"></i>
+                            <span>提取历史物候特征 (Extract Phenology)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="w-[40%] h-full bg-transparent backdrop-blur-[8px] p-5 overflow-y-auto relative border-l border-white/5 pointer-events-auto">
+                    <!-- 已保存的模型列表 -->
+                    <div id="gs-models-sidebar-panel" class="flex flex-col gap-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-white">已保存的金标准模型</h3>
+                            <span id="gs-sidebar-model-count" class="text-xs bg-tech-gold/20 text-tech-gold px-2 py-1 rounded">0</span>
+                        </div>
+                        <div id="gs-sidebar-models-container" class="space-y-3 max-h-96 overflow-y-auto">
+                            <div class="text-center py-8 text-gray-400">
+                                <i class="fa-solid fa-inbox text-2xl mb-2 opacity-50"></i>
+                                <p class="text-xs">加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="gs-empty-state" class="hidden flex flex-col items-center justify-center text-gray-800 p-10 text-center">
+                        <div class="w-24 h-24 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-location-dot text-3xl opacity-70"></i>
+                        </div>
+                        <h3 class="text-lg font-bold mb-2">等待采样</h3>
+                        <p class="text-sm">请在左侧地图选择点位，再提取历史物候特征。</p>
+                    </div>
+
+                    <div id="gs-analysis-content" class="hidden flex flex-col gap-5 pb-10">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center gap-2 text-tech-gold text-xs font-mono mb-1">
+                                    <i class="fa-solid fa-circle-check"></i><span>ANALYSIS COMPLETE</span>
+                                </div>
+                                <h2 class="text-xl font-bold text-white">风土标尺提取结果</h2>
+                            </div>
+                            <div class="text-right text-xs font-mono text-gray-400">
+                                <div id="gs-display-lat">LAT: --.----</div>
+                                <div id="gs-display-lon">LON: --.----</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="glass-panel p-3 rounded-xl border-l-2 border-tech-gold bg-transparent backdrop-blur-[8px] border border-white/10">
+                                <div class="text-gray-400 text-xs mb-1">过去5年平均气温</div>
+                                <div class="text-xl font-bold text-white" id="gs-stat-temp">--°C</div>
+                            </div>
+                            <div class="glass-panel p-3 rounded-xl border-l-2 border-blue-400 bg-transparent backdrop-blur-[8px] border border-white/10">
+                                <div class="text-gray-400 text-xs mb-1">过去5年累计降水</div>
+                                <div class="text-xl font-bold text-white" id="gs-stat-rain">-- mm</div>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel p-4 rounded-xl bg-transparent backdrop-blur-[8px] border border-white/10">
+                            <h3 class="text-sm font-bold text-gray-300 mb-3">标准 NDVI 生长曲线</h3>
+                            <div class="h-48 w-full"><canvas id="gs-phenology-chart"></canvas></div>
+                        </div>
+
+                        <div class="glass-panel p-4 rounded-xl bg-transparent backdrop-blur-[8px] border border-white/10">
+                            <h3 class="text-sm font-bold text-gray-300 mb-3">关键节点</h3>
+                            <div class="flex justify-between text-xs">
+                                <span>发芽期：<b id="gs-milestone-germ">--</b></span>
+                                <span>成熟期：<b id="gs-milestone-mat">--</b></span>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel p-4 rounded-xl border border-tech-gold/20 bg-transparent backdrop-blur-[8px] border border-white/10">
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">模型名称</label>
+                                    <input type="text" id="gs-model-name" placeholder="例如：洛川富士苹果标准模型"
+                                           class="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-tech-gold outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">适宜作物类型 (Crop Type)</label>
+                                    <input type="text" id="gs-crop-type" placeholder="例如：苹果"
+                                           class="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-tech-gold outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">标签选择</label>
+                                    <div class="flex flex-wrap gap-2" id="gs-tags-container"></div>
+                                </div>
+                                <button id="gs-save-btn" class="w-full bg-tech-gold hover:bg-amber-400 text-black font-bold py-3 rounded-lg shadow-lg transition flex justify-center items-center gap-2">
+                                    <span>💾 保存为金标准模型 (Save as Golden Standard)</span>
+                                </button>
+                                <button id="gs-view-all-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg shadow-lg transition flex justify-center items-center gap-2 text-sm">
+                                    <i class="fa-solid fa-list"></i><span>查看所有保存的金标准模型</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 金标准模型列表模态框 -->
+        <div id="gs-modal-overlay" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+            <div class="glass-panel bg-transparent backdrop-blur-[12px] border border-white/20 rounded-2xl shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <div class="sticky top-0 p-6 border-b border-white/10 flex items-center justify-between bg-black/30">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">已保存的金标准模型库</h2>
+                        <p class="text-xs text-gray-400 mt-1">共 <span id="gs-model-count">0</span> 个已保存模型</p>
+                    </div>
+                    <button id="gs-modal-close" class="text-gray-400 hover:text-white transition">
+                        <i class="fa-solid fa-xmark text-2xl"></i>
+                    </button>
+                </div>
+                
+                <div id="gs-model-list" class="p-6 space-y-4">
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="fa-solid fa-hourglass text-3xl mb-2 opacity-50"></i>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 重命名模型模态框 -->
+        <div id="gs-rename-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+            <div class="glass-panel bg-transparent backdrop-blur-[12px] border border-white/20 rounded-2xl shadow-2xl max-w-md w-full mx-4">
+                <div class="p-6 border-b border-white/10 flex items-center justify-between bg-black/30">
+                    <h2 class="text-xl font-bold text-white">重命名模型</h2>
+                    <button onclick="gsCloseRenameModal()" class="text-gray-400 hover:text-white transition">
+                        <i class="fa-solid fa-xmark text-2xl"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-2">新模型名称</label>
+                        <input type="text" id="gs-rename-input" placeholder="例如：洛川富士苹果标准模型" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-gold">
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="gsConfirmRename()" class="flex-1 bg-tech-gold hover:bg-amber-400 text-black font-bold py-2 rounded-lg transition">
+                            <i class="fa-solid fa-check"></i> 确认
+                        </button>
+                        <button onclick="gsCloseRenameModal()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition">
+                            取消
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 查看曲线模态框 -->
+        <div id="gs-curve-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center">
+            <div class="glass-panel bg-transparent backdrop-blur-[12px] border border-white/20 rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+                <div class="sticky top-0 p-6 border-b border-white/10 flex items-center justify-between bg-black/30">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white" id="gs-curve-modal-title">模型曲线详情</h2>
+                        <p class="text-xs text-gray-400 mt-1">NDVI 植被指数 &amp; LST 地表温度</p>
+                    </div>
+                    <button id="gs-curve-modal-close" class="text-gray-400 hover:text-white transition">
+                        <i class="fa-solid fa-xmark text-2xl"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <!-- 模型信息摘要 -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="glass-panel p-3 rounded-lg border border-white/10 bg-black/30">
+                            <p class="text-xs text-gray-400">保存时间</p>
+                            <p class="text-sm font-mono text-white" id="gs-curve-created-at">--</p>
+                        </div>
+                        <div class="glass-panel p-3 rounded-lg border border-white/10 bg-black/30">
+                            <p class="text-xs text-gray-400">采样位置</p>
+                            <p class="text-sm font-mono text-white" id="gs-curve-location">--°, --°</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 曲线图表 -->
+                    <div class="glass-panel p-4 rounded-xl border border-white/10 bg-black/30">
+                        <h3 class="text-sm font-bold text-gray-300 mb-4">物候生长曲线</h3>
+                        <div class="h-96 w-full">
+                            <canvas id="gs-curve-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <div class="flex gap-3 pt-3 border-t border-white/10">
+                        <button id="gs-curve-download-btn" class="flex-1 bg-tech-gold hover:bg-amber-400 text-black font-bold py-2 px-4 rounded-lg transition flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-download"></i> 保存为图片 (PNG)
+                        </button>
+                        <button id="gs-curve-close-btn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">
+                            关闭
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- 天眼扫描控制台内容-->
+
+    <div id="scan-console" class="module-content">
+
+        <div class="absolute top-1/2 right-6 transform -translate-y-1/2 z-10 flex flex-col gap-4 w-80 md:ml-64 max-h-[90vh] overflow-y-auto pr-2">
+
+            
+
+            <div class="glass-panel p-5 rounded-2xl pointer-events-auto">
+
+                <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4 flex justify-between items-center">
+
+                    <span>Real-time Telemetry</span>
+
+                    <i class="fa-solid fa-signal text-tech-green"></i>
+
+                </h3>
+
+                
+
+                <div class="grid grid-cols-2 gap-4">
+
+                    <div class="bg-black/20 p-3 rounded-lg">
+
+                        <div class="text-xs text-gray-500 mb-1">LST (地表温度)</div>
+
+                        <div class="text-2xl font-mono font-light">18.5<span class="text-sm text-gray-500 ml-1">°C</span></div>
+
+                    </div>
+
+                    <div class="bg-black/20 p-3 rounded-lg">
+
+                        <div class="text-xs text-gray-500 mb-1">MOISTURE</div>
+
+                        <div class="text-2xl font-mono font-light">42<span class="text-sm text-gray-500 ml-1">%</span></div>
+
+                    </div>
+
+                    <div class="bg-black/20 p-3 rounded-lg">
+
+                        <div class="text-xs text-gray-500 mb-1">SOIL pH</div>
+
+                        <div class="text-2xl font-mono font-light">6.5<span class="text-sm text-gray-500 ml-1"></span></div>
+
+                    </div>
+
+                    <div class="bg-black/20 p-3 rounded-lg">
+
+                        <div class="text-xs text-gray-500 mb-1">PAR (光照)</div>
+
+                        <div class="text-2xl font-mono font-light">1200<span class="text-sm text-gray-500 ml-1">μ</span></div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <div id="result-panel" class="glass-panel p-0 rounded-2xl pointer-events-auto overflow-hidden transition-all duration-500 max-h-96 overflow-y-auto">
+
+                <div class="bg-gradient-to-r from-emerald-900/50 to-transparent p-5 border-b border-white/10">
+
+                    <h3 class="text-tech-green text-sm font-bold flex items-center gap-2">
+
+                        <i class="fa-solid fa-map-location-dot"></i> 区域选取与管理
+
+                    </h3>
+
+                </div>
+
+                <div class="p-5">
+
+                    <div class="mb-4">
+
+                        <div class="text-gray-400 text-xs mb-1">当前选中区域</div>
+
+                        <div id="scan-selected-region-label" class="text-lg font-bold">未选取</div>
+
+                        <div id="scan-selected-region-coord" class="text-right text-xs text-tech-green mt-1 font-mono">请点击“启用地图选区”后在地图单击</div>
+
+                    </div>
+
+
+
+                    <div class="mb-4">
+                        <label class="text-xs text-gray-400 block mb-1">区域名称</label>
+                        <input type="text" id="scan-region-name-input" placeholder="例如：陕西自定义区1" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+                    </div>
+
+                    <div class="flex gap-2 border-t border-gray-700 pt-4 mt-4">
+                        <button onclick="saveScanRegion()" class="flex-1 min-w-0 text-[11px] md:text-xs whitespace-nowrap bg-tech-gold hover:bg-amber-400 px-2 py-2 rounded text-black font-bold transition cursor-pointer">
+                            💾 保存
+                        </button>
+                        <button onclick="clearScanSelectedRegion()" class="flex-1 min-w-0 text-[11px] md:text-xs whitespace-nowrap bg-red-600/70 hover:bg-red-600 px-2 py-2 rounded text-white transition cursor-pointer">
+                            ✖ 取消
+                        </button>
+                        <button onclick="enableRegionSelection()" class="flex-1 min-w-0 text-[11px] md:text-xs whitespace-nowrap bg-white/10 hover:bg-white/20 px-2 py-2 rounded text-white transition cursor-pointer">
+                            🗺️ 重选
+                        </button>
+                        <button onclick="applySelectedRegionToAnalysis()" class="flex-1 min-w-0 text-[11px] md:text-xs whitespace-nowrap bg-tech-green/80 hover:bg-tech-green px-2 py-2 rounded text-black font-bold transition cursor-pointer">
+                            → 分析
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- 已保存区域列表 -->
+                <div id="scan-regions-list-panel" class="p-5">
+                    <div class="mb-3">
+                        <h4 class="text-xs text-gray-400 uppercase tracking-widest mb-2">已保存的区域</h4>
+                        <div id="scan-regions-container" class="space-y-2 max-h-80 overflow-y-auto">
+                            <div class="text-xs text-gray-500 text-center py-6">
+                                <i class="fa-solid fa-inbox block mb-2 text-lg opacity-50"></i>
+                                暂无保存的区域
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+
+
+        </div>
+
+        
+
+    
+
+    </div>
+
+
+
+    <!-- 风土适宜性分析内容 -->
+
+    <div id="suitability-analysis" class="module-content hidden">
+
+        <div class="absolute top-20 left-24 md:left-72 right-6 bottom-6 z-10 flex flex-col gap-6 overflow-y-auto pr-2 pb-4">
+
+            <div class="glass-panel p-5 rounded-2xl pointer-events-auto">
+
+                <div class="flex justify-between items-center mb-6">
+
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+
+                        <i class="fa-solid fa-chart-radar text-tech-green"></i>
+
+                        风土适宜性智能评估系统
+
+                    </h2>
+
+                </div>
+
+                
+
+                <div class="flex border-b border-gray-700 mb-6">
+
+                    <button class="tab-active px-4 py-2 text-sm font-medium transition" onclick="switchAnalysisTab('ahp', event)">
+
+                        <i class="fa-solid fa-mountain mr-2"></i>
+
+                        AHP 适宜性分析
+
+                    </button>
+
+                    <button class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition" onclick="switchAnalysisTab('phenology', event)">
+
+                        <i class="fa-solid fa-seedling mr-2"></i>
+
+                        物候期匹配分析
+
+                    </button>
+
+                </div>
+
+                
+
+                <div id="ahp-tab" class="tab-content">
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                        <div class="glass-panel p-5 rounded-2xl">
+
+                            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">参数设置</h3>
+
+                            
+
+                            <div class="space-y-4">
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">分析区域</label>
+
+                                    <select id="analysis-region" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option>陕西洛川 (109.4°E, 35.8°N)</option>
+
+                                        <option>甘肃天水</option>
+
+                                        <option>山西运城</option>
+
+                                        <option>河南灵宝</option>
+
+                                    </select>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-3">搜索半径</label>
+
+                                    <div class="space-y-3">
+
+                                        <!-- 滑动条 -->
+
+                                        <div class="relative">
+
+                                            <input type="range" id="search-radius" min="0" max="100" value="50" class="w-full h-2 bg-gray-700 rounded-full appearance-none cursor-pointer accent-tech-green" oninput="updateRadiusValue(this.value)">
+
+                                        </div>
+
+                                        <!-- 范围标记 -->
+
+                                        <div class="flex justify-between text-xs text-gray-400">
+
+                                            <span>0km</span>
+
+                                            <span>25km</span>
+
+                                            <span>50km</span>
+
+                                            <span>75km</span>
+
+                                            <span>100km</span>
+
+                                        </div>
+
+                                        <!-- 数值显示 -->
+
+                                        <div class="glass-panel p-3 rounded-lg flex items-center justify-between">
+
+                                            <span class="text-xs text-gray-400">当前设置</span>
+
+                                            <div class="flex items-center gap-2">
+
+                                                <i class="fa-solid fa-globe text-tech-green text-sm"></i>
+
+                                                <div class="relative">
+
+                                                    <input type="number" id="radius-input" min="0" max="100" value="50" class="w-20 bg-black/50 border border-gray-700 rounded-lg px-2 py-1 text-lg font-mono text-tech-green font-bold focus:outline-none focus:ring-2 focus:ring-tech-green" onchange="updateRadiusFromInput(this.value)">
+
+                                                    <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">km</span>
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">作物类型</label>
+
+                                    <select class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option>富士苹果</option>
+
+                                        <option>红富士苹果</option>
+
+                                        <option>嘎啦苹果</option>
+
+                                        <option>秦冠苹果</option>
+
+                                    </select>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        
+
+                        <div class="glass-panel p-5 rounded-2xl">
+
+                            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">权重分配</h3>
+
+                            
+
+                            <div class="space-y-4">
+
+                                <div class="flex justify-between items-center">
+
+                                    <span class="text-sm text-gray-300">坡度 (Slope)</span>
+
+                                    <span class="text-sm font-mono text-tech-green">35%</span>
+
+                                </div>
+
+                                
+
+                                <div class="flex justify-between items-center">
+
+                                    <span class="text-sm text-gray-300">海拔 (Elevation)</span>
+
+                                    <span class="text-sm font-mono text-tech-green">25%</span>
+
+                                </div>
+
+                                
+
+                                <div class="flex justify-between items-center">
+
+                                    <span class="text-sm text-gray-300">坡向 (Aspect)</span>
+
+                                    <span class="text-sm font-mono text-tech-green">20%</span>
+
+                                </div>
+
+                                
+
+                                <div class="flex justify-between items-center">
+
+                                    <span class="text-sm text-gray-300">气候 (Climate)</span>
+
+                                    <span class="text-sm font-mono text-tech-green">20%</span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        
+
+                        <div class="glass-panel p-5 rounded-2xl">
+
+                            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">执行控制</h3>
+
+                            
+
+                            <div class="space-y-4">
+
+                                <div class="flex items-center justify-between">
+
+                                    <span class="text-sm">启用地形分析</span>
+
+                                    <label class="relative inline-flex items-center cursor-pointer">
+
+                                        <input type="checkbox" value="" class="sr-only peer" checked>
+
+                                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech-green"></div>
+
+                                    </label>
+
+                                </div>
+
+                                
+
+                                <div class="flex items-center justify-between">
+
+                                    <span class="text-sm">启用气候分析</span>
+
+                                    <label class="relative inline-flex items-center cursor-pointer">
+
+                                        <input type="checkbox" value="" class="sr-only peer" checked>
+
+                                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech-green"></div>
+
+                                    </label>
+
+                                </div>
+
+                                
+
+                                <div class="flex items-center justify-between">
+
+                                    <span class="text-sm">生成详细报告</span>
+
+                                    <label class="relative inline-flex items-center cursor-pointer">
+
+                                        <input type="checkbox" value="" class="sr-only peer">
+
+                                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech-green"></div>
+
+                                    </label>
+
+                                </div>
+
+                                
+
+                                <button onclick="runAHP()" id="ahp-btn" class="w-full bg-tech-green hover:bg-emerald-600 text-black font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-primary cursor-pointer">
+
+                                    <i class="fa-solid fa-play"></i>
+
+                                    <span>运行 AHP 分析</span>
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                
+
+                <div id="phenology-tab" class="tab-content hidden">
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                        <div class="glass-panel p-5 rounded-2xl">
+
+                            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">参数设置</h3>
+
+                            
+
+                            <div class="space-y-4">
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">🎯 目标产区</label>
+
+                                    <input id="target-region" type="text" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-tech-green" readonly placeholder="自动同步 AHP 分析区域">
+
+                                    <p class="text-xs text-gray-500 mt-2">💡 自动与 AHP 分析区域保持一致</p>
+
+                                </div>
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">📍 参考产区</label>
+
+                                    <select id="reference-region-select" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option value="">-- 对比所有已保存产区 --</option>
+
+                                    </select>
+
+                                    <p class="text-xs text-gray-500 mt-2">💡 选择要对标的参考产区/金标准</p>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">分析年份</label>
+
+                                    <select id="phenology-year" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option value="2020">2020</option>
+
+                                        <option value="2021">2021</option>
+
+                                        <option value="2022">2022</option>
+
+                                        <option value="2023">2023</option>
+
+                                    </select>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-3">相似度阈值</label>
+
+                                    <div class="space-y-3">
+
+                                        <!-- 滑动条 -->
+
+                                        <div class="relative">
+
+                                            <input type="range" id="similarity-threshold" min="0" max="100" value="60" class="w-full h-2 bg-gray-700 rounded-full appearance-none cursor-pointer accent-tech-green" oninput="updateSimilarityValue(this.value)">
+
+                                        </div>
+
+                                        <!-- 范围标记 -->
+
+                                        <div class="flex justify-between text-xs text-gray-400">
+
+                                            <span>0%</span>
+
+                                            <span>25%</span>
+
+                                            <span>50%</span>
+
+                                            <span>75%</span>
+
+                                            <span>100%</span>
+
+                                        </div>
+
+                                        <!-- 数值显示 -->
+
+                                        <div class="glass-panel p-3 rounded-lg flex items-center justify-between">
+
+                                            <span class="text-xs text-gray-400">当前设置</span>
+
+                                            <div class="flex items-center gap-2">
+
+                                                <i class="fa-solid fa-chart-line text-tech-green text-sm"></i>
+
+                                                <div class="relative">
+
+                                                    <input type="number" id="similarity-input" min="0" max="100" value="60" class="w-20 bg-black/50 border border-gray-700 rounded-lg px-2 py-1 text-lg font-mono text-tech-green font-bold focus:outline-none focus:ring-2 focus:ring-tech-green" onchange="updateSimilarityFromInput(this.value)">
+
+                                                    <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">%</span>
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-3">数据年份</label>
+
+                                    <select id="phenology-year" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option value="2018">2018年</option>
+
+                                        <option value="2019">2019年</option>
+
+                                        <option value="2020" selected>2020年</option>
+
+                                        <option value="2021">2021年</option>
+
+                                        <option value="2022">2022年</option>
+
+                                    </select>
+
+                                    <p class="text-xs text-gray-500 mt-1">💡 使用自定义金标准时的同一年份，匹配效果更准确</p>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-3">分析半径</label>
+
+                                    <div class="space-y-3">
+
+                                        <!-- 滑动条 -->
+
+                                        <div class="relative">
+
+                                            <input type="range" id="phenology-radius" min="0" max="100" value="50" class="w-full h-2 bg-gray-700 rounded-full appearance-none cursor-pointer accent-tech-green" oninput="updatePhenologyRadiusValue(this.value)">
+
+                                        </div>
+
+                                        <!-- 范围标记 -->
+
+                                        <div class="flex justify-between text-xs text-gray-400">
+
+                                            <span>0km</span>
+
+                                            <span>25km</span>
+
+                                            <span>50km</span>
+
+                                            <span>75km</span>
+
+                                            <span>100km</span>
+
+                                        </div>
+
+                                        <!-- 数值显示 -->
+
+                                        <div class="glass-panel p-3 rounded-lg flex items-center justify-between">
+
+                                            <span class="text-xs text-gray-400">当前设置</span>
+
+                                            <div class="flex items-center gap-2">
+
+                                                <i class="fa-solid fa-globe text-tech-green text-sm"></i>
+
+                                                <div class="relative">
+
+                                                    <input type="number" id="phenology-radius-input" min="0" max="100" value="50" class="w-20 bg-black/50 border border-gray-700 rounded-lg px-2 py-1 text-lg font-mono text-tech-green font-bold focus:outline-none focus:ring-2 focus:ring-tech-green" onchange="updatePhenologyRadiusFromInput(this.value)">
+
+                                                    <span class="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">km</span>
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        
+
+                        <div class="glass-panel p-5 rounded-2xl">
+
+                            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">采样设置</h3>
+
+                            
+
+                            <div class="space-y-4">
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">采样点数</label>
+
+                                    <select id="phenology-sample-points" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option value="10">10</option>
+
+                                        <option value="20" selected>20</option>
+
+                                        <option value="30">30</option>
+
+                                        <option value="50">50</option>
+
+                                    </select>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">采样分辨率</label>
+
+                                    <select id="phenology-sample-resolution" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option value="500">500m</option>
+
+                                        <option value="1000" selected>1000m</option>
+
+                                        <option value="2000">2000m</option>
+
+                                        <option value="5000">5000m</option>
+
+                                    </select>
+
+                                </div>
+
+                                
+
+                                <div>
+
+                                    <label class="text-xs text-gray-500 block mb-1">Top N 结果</label>
+
+                                    <select id="phenology-top-n" class="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-tech-green">
+
+                                        <option value="5" selected>5</option>
+
+                                        <option value="10">10</option>
+
+                                        <option value="15">15</option>
+
+                                        <option value="20">20</option>
+
+                                    </select>
+
+                                </div>
+
+                                
+
+                            </div>
+
+                        </div>
+
+                        
+
+                        <div class="glass-panel p-5 rounded-2xl">
+
+                            <h3 class="text-gray-400 text-xs uppercase tracking-widest mb-4">执行控制</h3>
+
+                            
+
+                            <div class="space-y-4">
+
+                                <div class="flex items-center justify-between">
+
+                                    <span class="text-sm">启用 NDVI 分析</span>
+
+                                    <label class="relative inline-flex items-center cursor-pointer">
+
+                                        <input type="checkbox" value="" class="sr-only peer" checked>
+
+                                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech-green"></div>
+
+                                    </label>
+
+                                </div>
+
+                                
+
+                                <div class="flex items-center justify-between">
+
+                                    <span class="text-sm">生成物候曲线</span>
+
+                                    <label class="relative inline-flex items-center cursor-pointer">
+
+                                        <input type="checkbox" value="" class="sr-only peer" checked>
+
+                                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech-green"></div>
+
+                                    </label>
+
+                                </div>
+
+                                
+
+                                <div class="flex items-center justify-between">
+
+                                    <span class="text-sm">导出匹配结果</span>
+
+                                    <label class="relative inline-flex items-center cursor-pointer">
+
+                                        <input type="checkbox" value="" class="sr-only peer">
+
+                                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-tech-green"></div>
+
+                                    </label>
+
+                                </div>
+
+                                
+
+                                <button onclick="runPhenology()" id="phenology-btn" class="w-full bg-tech-green hover:bg-emerald-600 text-black font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-primary cursor-pointer">
+
+                                    <i class="fa-solid fa-play"></i>
+
+                                    <span>运行物候匹配</span>
+
+                                </button>
+
+                                <button onclick="showPhenologySimilarityPlots()" id="phenology-map-btn" disabled class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
+
+                                    <i class="fa-solid fa-map-location-dot"></i>
+
+                                    <span>查看底图标注</span>
+
+                                </button>
+
+                                <button onclick="clearPhenologyMapOverlays()" id="phenology-map-clear-btn" disabled class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-300 font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
+
+                                    <i class="fa-solid fa-eraser"></i>
+
+                                    <span>清除底图标注</span>
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        
+        <!-- Merged Layout Boundary -->
+
+
+            <div class="glass-panel p-5 rounded-2xl pointer-events-auto">
+
+                <div class="flex justify-between items-center mb-4">
+
+                    <h3 class="text-gray-400 text-xs uppercase tracking-widest">分析结果</h3>
+
+                    <div class="flex gap-2">
+
+                        <button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white transition cursor-pointer">
+
+                            <i class="fa-solid fa-download mr-1"></i>
+
+                            导出报告
+
+                        </button>
+
+                        <button class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white transition cursor-pointer">
+
+                            <i class="fa-solid fa-share-nodes mr-1"></i>
+
+                            分享结果
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+                
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <div class="bg-black/20 p-4 rounded-lg">
+
+                        <div class="text-xs text-gray-500 mb-1">平均适宜性得分</div>
+
+                        <div class="flex flex-col items-center text-center">
+
+                            <div class="text-3xl font-mono font-light" id="avg-score">0.0</div>
+
+                            <div class="text-xs text-gray-500 mt-1">基于 AHP 加权分析</div>
+
+                            <button onclick="hideSuitabilityHeatmap()" class="mt-3 text-xs bg-red-600/20 hover:bg-red-600/30 border border-red-400/30 px-3 py-1 rounded text-red-300 transition cursor-pointer">
+
+                                取消热力图
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                    
+
+                    <div class="bg-black/20 p-4 rounded-lg">
+
+                        <div class="text-xs text-gray-500 mb-1">平均匹配相似度</div>
+
+                        <div class="flex flex-col items-center text-center">
+
+                            <div class="text-3xl font-mono font-light" id="best-similarity">0%</div>
+
+                            <div class="text-xs text-gray-500 mt-1">基于物候期匹配</div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                
+
+                <!-- 可折叠的地块数量面板 -->
+
+                <div class="mt-4">
+
+                    <div class="bg-black/20 rounded-lg overflow-hidden">
+
+                        <div class="p-4 cursor-pointer" onclick="toggleCollapse('land-parcels')">
+
+                            <div class="flex justify-between items-center">
+
+                                <div class="flex items-center gap-2">
+
+                                    <i class="fa-solid fa-layer-group text-tech-green"></i>
+
+                                    <h4 class="text-sm font-medium">地块数量分布</h4>
+
+                                </div>
+
+                                <i class="fa-solid fa-chevron-down text-gray-400 transition-transform duration-300" id="land-parcels-icon"></i>
+
+                            </div>
+
+                        </div>
+
+                        <div id="land-parcels" class="p-4 border-t border-gray-700 hidden">
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                                <div class="bg-black/30 p-3 rounded-lg cursor-pointer" ondblclick="showAHPClassPlots('S')" title="双击在底图显示 S 级地块">
+
+                                    <div class="text-xs text-gray-500 mb-1">S级地块</div>
+
+                                    <div class="text-2xl font-mono font-light" id="s-class-count">0</div>
+
+                                    <div class="text-xs text-gray-500 mt-1">得分 > 90 的优质地块</div>
+
+                                </div>
+
+                                
+
+                                <div class="bg-black/30 p-3 rounded-lg cursor-pointer" ondblclick="showAHPClassPlots('A')" title="双击在底图显示 A 级地块">
+
+                                    <div class="text-xs text-gray-500 mb-1">A级地块</div>
+
+                                    <div class="text-2xl font-mono font-light" id="a-class-count">0</div>
+
+                                    <div class="text-xs text-gray-500 mt-1">得分 80-90</div>
+
+                                </div>
+
+                                
+
+                                <div class="bg-black/30 p-3 rounded-lg cursor-pointer" ondblclick="showAHPClassPlots('B')" title="双击在底图显示 B 级地块">
+
+                                    <div class="text-xs text-gray-500 mb-1">B级地块</div>
+
+                                    <div class="text-2xl font-mono font-light" id="b-class-count">0</div>
+
+                                    <div class="text-xs text-gray-500 mt-1">得分 70-80</div>
+
+                                </div>
+
+                                
+
+                                <div class="bg-black/30 p-3 rounded-lg cursor-pointer" ondblclick="showAHPClassPlots('C')" title="双击在底图显示 C 级地块">
+
+                                    <div class="text-xs text-gray-500 mb-1">C级地块</div>
+
+                                    <div class="text-2xl font-mono font-light" id="c-class-count">0</div>
+
+                                    <div class="text-xs text-gray-500 mt-1">得分 60-70</div>
+
+                                </div>
+
+                                
+
+                                <div class="bg-black/30 p-3 rounded-lg cursor-pointer" ondblclick="showAHPClassPlots('D')" title="双击在底图显示 D 级地块">
+
+                                    <div class="text-xs text-gray-500 mb-1">D级地块</div>
+
+                                    <div class="text-2xl font-mono font-light" id="d-class-count">0</div>
+
+                                    <div class="text-xs text-gray-500 mt-1">得分 < 60</div>
+
+                                </div>
+
+                                
+
+                                <div class="bg-black/30 p-3 rounded-lg">
+
+                                    <div class="text-xs text-gray-500 mb-1">总地块数量</div>
+
+                                    <div class="text-2xl font-mono font-light" id="total-count">0</div>
+
+                                    <div class="text-xs text-gray-500 mt-1">所有分级地块总和</div>
+
+                                </div>
+
+                            </div>
+
+                            <div class="mt-3 flex items-end justify-between gap-3">
+                                <div>
+                                    <div class="text-xs text-gray-500 italic">
+                                        备注：每个像素代表约25公顷的面积
+                                    </div>
+                                    <div class="mt-1 text-xs text-gray-500 italic">
+                                        提示：双击 S/A/B/C/D 分级卡片可在底图显示对应地块
+                                    </div>
+                                </div>
+                                <button onclick="clearAHPClassPlots()" class="text-xs bg-red-600/20 hover:bg-red-600/30 border border-red-400/30 px-3 py-1 rounded text-red-300 transition cursor-pointer whitespace-nowrap">
+                                    取消标注
+                                </button>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+
+                    <div>
+
+                        <h4 class="text-sm font-medium mb-3">适宜性等级分布</h4>
+
+                        <div class="bg-black/20 p-4 rounded-lg h-48">
+
+                            <canvas id="suitability-chart"></canvas>
+
+                        </div>
+
+                    </div>
+
+                    
+
+                    <div>
+
+                        <h4 class="text-sm font-medium mb-3">物候期曲线对比</h4>
+
+                        <div id="phenology-chart-wrapper" class="bg-black/20 p-4 rounded-lg h-48 phenology-chart-expandable">
+
+                            <button id="phenology-zoom-close" class="phenology-zoom-close" type="button" aria-label="关闭放大">×</button>
+
+                            <canvas id="phenology-chart"></canvas>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+
+
+
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="golden_standard.js"></script>
+
+    
+
+    <script>
+
+        // --- 全局变量 ---
+
+        let currentModule = 'scan-console';
+        let regionSelectionMode = false;
+        let scanSelectedRegion = null;
+        let scanSelectionMarker = null;
+        let scanSelectionCircle = null;
+        let phenologySampledMatches = [];
+        let phenologyLocalPoint = null;
+        let phenologyMarkersLayer = null;
+        let suitabilityHeatLayer = null;
+        let ahpClassPlotsLayer = null;
+
+        
+
+        // --- 初始化地图?---
+
+        // 这里使用深色卫星图源 (Esri Satellite) 配合 CSS 滤镜达到“科技黑”效果?
+
+        // --- 分析区域与参考产区联动 --- 
+        
+        // --- 初始化分析区域下拉框 ---
+        function initAnalysisRegionSelect() {
+            const analysisRegion = document.getElementById('analysis-region');
+            if (!analysisRegion) return;
+
+            if (!analysisRegion.dataset.defaultsSaved) {
+                const defaults = Array.from(analysisRegion.options).map(opt => ({
+                    value: opt.value,
+                    text: opt.textContent
+                }));
+                analysisRegion.dataset.defaultsSaved = JSON.stringify(defaults);
+            }
+
+            const savedRegions = getScanRegionsFromStorage();
+            const defaults = JSON.parse(analysisRegion.dataset.defaultsSaved || '[]');
+
+            analysisRegion.innerHTML = '';
+            defaults.forEach(def => {
+                const option = document.createElement('option');
+                option.value = def.value;
+                option.textContent = def.text;
+                analysisRegion.appendChild(option);
+            });
+
+            savedRegions.forEach(region => {
+                const label = `${region.name} (${region.label})`;
+                const exists = Array.from(analysisRegion.options).some(opt => opt.textContent === label);
+                if (!exists) {
+                    const option = document.createElement('option');
+                    option.value = label;
+                    option.textContent = label;
+                    analysisRegion.appendChild(option);
+                }
+            });
+        }
+        
+        function initRegionSync() {
+            const analysisRegion = document.getElementById('analysis-region');
+            const referenceRegion = document.getElementById('reference-region');
+            
+            // 初始化分析区域 - 加载已保存的区域
+            initAnalysisRegionSelect();
+            
+            if (analysisRegion && referenceRegion) {
+                // 初始同步
+                updateReferenceRegion();
+                
+                // 添加变化监听器
+                analysisRegion.addEventListener('change', updateReferenceRegion);
+            }
+        }
+        
+        function updateReferenceRegion() {
+            const analysisRegion = document.getElementById('analysis-region');
+            const referenceRegion = document.getElementById('reference-region');
+            
+            if (analysisRegion && referenceRegion) {
+                const selectedRegion = analysisRegion.value;
+                
+                // 清空现有选项
+                referenceRegion.innerHTML = '';
+                
+                // 添加与分析区域一致的选项
+                const option = document.createElement('option');
+                option.value = selectedRegion;
+                option.textContent = selectedRegion;
+                referenceRegion.appendChild(option);
+            }
+        }
+
+        const map = L.map('map', {
+
+            zoomControl: false,
+
+            attributionControl: false
+
+        }).setView([33.8, 109.9], 13); // 聚焦在陕西秦岭区域?
+
+
+
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+
+            maxZoom: 19,
+
+            opacity: 0.6 // 降低透明度让背景变暗
+
+        }).addTo(map);
+        window.mainMap = map;
+
+        // --- 搜索地名 (Forward Geocoding) ---
+        async function searchPlaceByName() {
+            const input = document.getElementById('place-search-input')?.value.trim();
+            if (!input) {
+                alert('请输入地名或地址');
+                return;
+            }
+
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(input)}&limit=10&accept-language=zh-CN`;
+                const response = await fetch(url, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) throw new Error('搜索失败');
+
+                const results = await response.json();
+                if (!results || results.length === 0) {
+                    alert('未找到该地点，请尝试其他搜索词');
+                    return;
+                }
+
+                // 显示搜索结果
+                const resultsDiv = document.getElementById('place-search-results');
+                resultsDiv.innerHTML = results.map((r, i) => `
+                    <div class="p-2 border-b border-gray-600 hover:bg-black/70 cursor-pointer transition" onclick="selectPlaceResult(${parseFloat(r.lat)}, ${parseFloat(r.lon)}, '${r.display_name.replace(/'/g, "\\'")}')">
+                        <div class="text-sm text-white">${r.display_name}</div>
+                        <div class="text-xs text-gray-400">${parseFloat(r.lat).toFixed(4)}°N, ${parseFloat(r.lon).toFixed(4)}°E</div>
+                    </div>
+                `).join('');
+                resultsDiv.classList.remove('hidden');
+            } catch (error) {
+                alert('地名搜索出错：' + error.message);
+            }
+        }
+
+        // --- 选择搜索结果 ---
+        function selectPlaceResult(lat, lon, placeName) {
+            // 隐藏搜索结果
+            document.getElementById('place-search-results').classList.add('hidden');
+            document.getElementById('place-search-input').value = placeName;
+
+            // 定位到该地点
+            setScanSelectedRegion(lat, lon);
+            map.setView([lat, lon], 10);
+        }
+
+        function formatRegionLabel(lat, lng) {
+            return `自定义区域 (${lng.toFixed(4)}°E, ${lat.toFixed(4)}°N)`;
+        }
+
+        let regionResolveSeq = 0;
+
+        function normalizeProvinceName(name) {
+            if (!name) return '';
+            return String(name)
+                .replace(/省$/u, '')
+                .replace(/壮族自治区|回族自治区|维吾尔自治区|自治区$/u, '')
+                .replace(/特别行政区$/u, '');
+        }
+
+        function formatPlaceNameFromAddress(address) {
+            if (!address) return '';
+            const provinceRaw = address.state || address.province || address.region || '';
+            const cityRaw = address.city || address.town || address.county || address.city_district || address.state_district || '';
+            const province = normalizeProvinceName(provinceRaw);
+            const city = String(cityRaw || '').trim();
+            if (province && city) return `${province} · ${city}`;
+            if (province) return province;
+            if (city) return city;
+            return '';
+        }
+
+        async function reverseGeocodePlaceName(lat, lng) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=10&addressdetails=1&accept-language=zh-CN`;
+            const response = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`地名解析失败 (${response.status})`);
+            }
+            const data = await response.json();
+            return formatPlaceNameFromAddress(data && data.address ? data.address : null);
+        }
+
+        function updateScanSidebarCoordinates(lat, lng) {
+            const latEl = document.getElementById('scan-selected-lat');
+            const lngEl = document.getElementById('scan-selected-lng');
+            if (latEl) latEl.textContent = `${lat.toFixed(4)}° N`;
+            if (lngEl) lngEl.textContent = `${lng.toFixed(4)}° E`;
+        }
+
+        function setScanSelectedRegion(lat, lng) {
+            scanSelectedRegion = { lat, lng };
+
+            const regionLabel = formatRegionLabel(lat, lng);
+            const labelEl = document.getElementById('scan-selected-region-label');
+            const coordEl = document.getElementById('scan-selected-region-coord');
+            if (labelEl) labelEl.textContent = regionLabel;
+            if (coordEl) coordEl.textContent = `经度 ${lng.toFixed(4)} / 纬度 ${lat.toFixed(4)}`;
+
+            updateScanSidebarCoordinates(lat, lng);
+
+            if (scanSelectionMarker) {
+                map.removeLayer(scanSelectionMarker);
+            }
+            if (scanSelectionCircle) {
+                map.removeLayer(scanSelectionCircle);
+            }
+
+            scanSelectionMarker = L.marker([lat, lng]).addTo(map)
+                .bindPopup(`<b>已选区域中心</b><br>${regionLabel}`)
+                .openPopup();
+            scanSelectionCircle = L.circle([lat, lng], {
+                radius: 20000,
+                color: '#10b981',
+                weight: 2,
+                fillColor: '#10b981',
+                fillOpacity: 0.12
+            }).addTo(map);
+
+            updateTargetSelectionDisplay();
+
+            const currentSeq = ++regionResolveSeq;
+            reverseGeocodePlaceName(lat, lng)
+                .then(placeName => {
+                    if (currentSeq !== regionResolveSeq) return;
+                    if (!scanSelectedRegion) return;
+                    if (scanSelectedRegion.lat !== lat || scanSelectedRegion.lng !== lng) return;
+                    if (!placeName) return;
+
+                    scanSelectedRegion.placeName = placeName;
+                    const currentLabelEl = document.getElementById('scan-selected-region-label');
+                    if (currentLabelEl) {
+                        currentLabelEl.textContent = placeName;
+                    }
+                    updateTargetSelectionDisplay();
+                })
+                .catch(() => {
+                    // 地名解析失败时保留经纬度显示
+                });
+        }
+
+        function updateTargetSelectionDisplay() {
+            const displayEl = document.getElementById('target-region-display');
+            if (!displayEl) return;
+
+            if (!scanSelectedRegion) {
+                displayEl.textContent = '未选择区域';
+                return;
+            }
+
+            const { lat, lng } = scanSelectedRegion;
+            displayEl.textContent = scanSelectedRegion.placeName || `${lng.toFixed(4)}°E, ${lat.toFixed(4)}°N`;
+        }
+
+        function clearScanSelectedRegion() {
+            regionSelectionMode = false;
+            scanSelectedRegion = null;
+            regionResolveSeq++;
+
+            if (scanSelectionMarker) {
+                map.removeLayer(scanSelectionMarker);
+                scanSelectionMarker = null;
+            }
+            if (scanSelectionCircle) {
+                map.removeLayer(scanSelectionCircle);
+                scanSelectionCircle = null;
+            }
+
+            const labelEl = document.getElementById('scan-selected-region-label');
+            const coordEl = document.getElementById('scan-selected-region-coord');
+            const nameInput = document.getElementById('scan-region-name-input');
+            const btn = document.getElementById('scan-btn');
+
+            if (labelEl) labelEl.textContent = '未选取';
+            if (coordEl) coordEl.textContent = '请点击“启用地图选区”后在地图单击';
+            if (nameInput) nameInput.value = '';
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i><span>启用地图选区</span>';
+
+            const center = map.getCenter();
+            updateScanSidebarCoordinates(center.lat, center.lng);
+            updateTargetSelectionDisplay();
+        }
+
+        function enableRegionSelection() {
+            regionSelectionMode = true;
+            const btn = document.getElementById('scan-btn');
+            const labelEl = document.getElementById('scan-selected-region-label');
+            const coordEl = document.getElementById('scan-selected-region-coord');
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i><span>请在地图单击选区</span>';
+            }
+            if (labelEl && !scanSelectedRegion) {
+                labelEl.textContent = '等待选区';
+            }
+            if (coordEl) {
+                coordEl.textContent = '地图单击后将更新区域中心坐标';
+            }
+        }
+
+        function applySelectedRegionToAnalysis() {
+            if (!scanSelectedRegion) {
+                alert('请先在天眼扫描控制台选择区域。');
+                return;
+            }
+
+            const analysisRegion = document.getElementById('analysis-region');
+            if (!analysisRegion) {
+                alert('未找到区域分析参数控件。');
+                return;
+            }
+
+            const customValue = formatRegionLabel(scanSelectedRegion.lat, scanSelectedRegion.lng);
+            const existingCustomOption = Array.from(analysisRegion.options).find(opt => opt.value.startsWith('自定义区域 ('));
+            if (existingCustomOption) {
+                existingCustomOption.value = customValue;
+                existingCustomOption.textContent = customValue;
+            } else {
+                const option = document.createElement('option');
+                option.value = customValue;
+                option.textContent = customValue;
+                analysisRegion.appendChild(option);
+            }
+
+            analysisRegion.value = customValue;
+            syncTargetRegion();
+            switchModule('suitability-analysis');
+        }
+
+        // 区域保存和管理功能
+        function getScanRegionsFromStorage() {
+            const stored = localStorage.getItem('scanRegions');
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveScanRegionsToStorage(regions) {
+            localStorage.setItem('scanRegions', JSON.stringify(regions));
+        }
+
+        function saveScanRegion() {
+            if (!scanSelectedRegion) {
+                alert('请先选择区域。');
+                return;
+            }
+            const nameInput = document.getElementById('scan-region-name-input');
+            const cropInput = document.getElementById('target-crop-name');
+            let name = (nameInput && nameInput.value.trim()) || formatRegionLabel(scanSelectedRegion.lat, scanSelectedRegion.lng);
+            const cropName = (cropInput && cropInput.value.trim()) ? ` · ${cropInput.value.trim()}` : '';
+            const fullName = name + cropName;
+            
+            const regions = getScanRegionsFromStorage();
+            const newRegion = {
+                id: Date.now(),
+                name: fullName,
+                lat: scanSelectedRegion.lat,
+                lng: scanSelectedRegion.lng,
+                label: formatRegionLabel(scanSelectedRegion.lat, scanSelectedRegion.lng),
+                crop: cropName
+            };
+            
+            regions.push(newRegion);
+            saveScanRegionsToStorage(regions);
+            
+            if (nameInput) nameInput.value = '';
+            if (cropInput) cropInput.value = '';
+            alert(`已保存区域: ${fullName}`);
+            
+            loadScanRegionsList();
+            initAnalysisRegionSelect();
+            updateTargetSelectionDisplay();
+        }
+
+        function loadScanRegionsList() {
+            const regions = getScanRegionsFromStorage();
+            const container = document.getElementById('scan-regions-container');
+            if (!container) return;
+            
+            if (regions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-xs text-gray-500 text-center py-6">
+                        <i class="fa-solid fa-inbox block mb-2 text-lg opacity-50"></i>
+                        暂无保存的区域
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = regions.map(region => `
+                <div class="bg-black/20 p-3 rounded-lg border border-gray-700 flex justify-between items-start gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-bold text-white truncate">${region.name}</div>
+                        <div class="text-xs text-tech-green font-mono mt-1">${region.label}</div>
+                    </div>
+                    <div class="flex gap-1 flex-shrink-0">
+                        <button onclick="applyScanRegion(${region.id})" class="text-xs bg-tech-green/60 hover:bg-tech-green px-2 py-1 rounded text-black font-bold transition cursor-pointer">
+                            用
+                        </button>
+                        <button onclick="deleteScanRegion(${region.id})" class="text-xs bg-red-600/60 hover:bg-red-600 px-2 py-1 rounded text-white transition cursor-pointer">
+                            删
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function applyScanRegion(regionId) {
+            const regions = getScanRegionsFromStorage();
+            const region = regions.find(r => r.id === regionId);
+            if (!region) return;
+            
+            setScanSelectedRegion(region.lat, region.lng);
+            scanSelectedRegion = { lat: region.lat, lng: region.lng };
+            
+            const nameInput = document.getElementById('scan-region-name-input');
+            const cropInput = document.getElementById('target-crop-name');
+            if (nameInput) nameInput.value = region.name;
+            if (cropInput && region.crop) {
+                cropInput.value = region.crop.replace(' · ', '').trim();
+            }
+        }
+
+        function deleteScanRegion(regionId) {
+            if (!confirm('确认删除该区域吗？')) return;
+            
+            let regions = getScanRegionsFromStorage();
+            regions = regions.filter(r => r.id !== regionId);
+            saveScanRegionsToStorage(regions);
+            
+            loadScanRegionsList();
+            initAnalysisRegionSelect();
+        }
+
+        function initScanRegionSelection() {
+            loadScanRegionsList();
+
+            map.on('click', (event) => {
+                if (!regionSelectionMode) return;
+                const { lat, lng } = event.latlng;
+                setScanSelectedRegion(lat, lng);
+                regionSelectionMode = false;
+
+                const btn = document.getElementById('scan-btn');
+                if (btn) {
+                    btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i><span>启用地图选区</span>';
+                }
+            });
+
+            const center = map.getCenter();
+            updateScanSidebarCoordinates(center.lat, center.lng);
+        }
+
+        
+
+        // --- 2. 模块切换功能 ---
+
+        function switchModule(moduleId) {
+
+            // 隐藏所有模块?
+
+            document.querySelectorAll('.module-content').forEach(module => {
+
+                module.classList.add('hidden');
+
+            });
+
+            
+
+            // 显示选中的模块?
+
+            document.getElementById(moduleId).classList.remove('hidden');
+
+            
+
+            // 更新导航状态?
+
+            document.getElementById('nav-scan').classList.remove('bg-tech-green/10', 'border-tech-green/30', 'text-tech-green');
+
+            document.getElementById('nav-scan').classList.add('hover:bg-white/5', 'border-transparent', 'hover:border-white/10', 'text-gray-400', 'hover:text-white');
+
+            
+
+            document.getElementById('nav-analysis').classList.remove('bg-tech-green/10', 'border-tech-green/30', 'text-tech-green');
+            document.getElementById('nav-analysis').classList.add('hover:bg-white/5', 'border-transparent', 'hover:border-white/10', 'text-gray-400', 'hover:text-white');
+            document.getElementById('nav-models').classList.remove('bg-tech-green/10', 'border-tech-green/30', 'text-tech-green');
+            document.getElementById('nav-models').classList.add('hover:bg-white/5', 'border-transparent', 'hover:border-white/10', 'text-gray-400', 'hover:text-white');
+
+            
+
+            // 设置当前导航项为激活状态?
+
+            if (moduleId === 'scan-console') {
+
+                document.getElementById('nav-scan').classList.remove('hover:bg-white/5', 'border-transparent', 'hover:border-white/10', 'text-gray-400', 'hover:text-white');
+
+                document.getElementById('nav-scan').classList.add('bg-tech-green/10', 'border-tech-green/30', 'text-tech-green');
+
+            } else if (moduleId === 'suitability-analysis') {
+
+                document.getElementById('nav-analysis').classList.remove('hover:bg-white/5', 'border-transparent', 'hover:border-white/10', 'text-gray-400', 'hover:text-white');
+
+                document.getElementById('nav-analysis').classList.add('bg-tech-green/10', 'border-tech-green/30', 'text-tech-green');
+                
+                // 加载参考产区列表、同步目标产区、初始化同步监听器
+                loadGoldenStandardsForPhenology();
+                initPhenologyRegionSync();
+
+            } else {
+                document.getElementById('nav-models').classList.remove('hover:bg-white/5', 'border-transparent', 'hover:border-white/10', 'text-gray-400', 'hover:text-white');
+                document.getElementById('nav-models').classList.add('bg-tech-green/10', 'border-tech-green/30', 'text-tech-green');
+                if (window.initGoldenStandardModule) {
+                    window.initGoldenStandardModule();
+                }
+
+            }
+
+            
+
+            // 更新当前模块
+
+            currentModule = moduleId;
+
+        }
+
+        
+
+        // --- 3A. 物候匹配 - 加载参考产区列表与同步目标产区 ---
+        async function loadGoldenStandardsForPhenology() {
+            const referenceSelect = document.getElementById('reference-region-select');
+            if (!referenceSelect) return;
+            
+            try {
+                const res = await fetch('/api/golden-standards-list');
+                if (!res.ok) throw new Error('Failed to load golden standards');
+                
+                const standards = await res.json();
+                console.log('[物候] 加载了 ' + standards.length + ' 个参考产区');
+                
+                // 保留第一个选项（全部对比）
+                const firstOption = referenceSelect.options[0];
+                referenceSelect.innerHTML = '';
+                referenceSelect.appendChild(firstOption);
+                
+                // 添加每个参考产区
+                standards.forEach(std => {
+                    const option = document.createElement('option');
+                    option.value = std.id;
+                    option.textContent = `${std.model_name} (${std.crop_type})`;
+                    referenceSelect.appendChild(option);
+                });
+                
+            } catch (e) {
+                console.error('[物候] 加载参考产区列表失败:', e);
+            }
+            
+            // 同时同步目标产区
+            syncTargetRegion();
+        }
+        
+        // 同步目标产区（自动与 AHP 分析区域保持一致）
+        function syncTargetRegion() {
+            const analysisRegion = document.getElementById('analysis-region');
+            const targetRegion = document.getElementById('target-region');
+            
+            if (analysisRegion && targetRegion) {
+                targetRegion.value = analysisRegion.value;
+                console.log('[物候] 目标产区已同步: ' + analysisRegion.value);
+            }
+        }
+        
+        // 监听 AHP 分析区域的变化，自动更新物候匹配中的目标产区
+        function initPhenologyRegionSync() {
+            const analysisRegion = document.getElementById('analysis-region');
+            if (analysisRegion) {
+                analysisRegion.addEventListener('change', syncTargetRegion);
+                console.log('[物候] 已初始化分析区域同步监听器');
+            }
+        }
+
+        function initPhenologyChartZoom() {
+            const wrapper = document.getElementById('phenology-chart-wrapper');
+            const closeBtn = document.getElementById('phenology-zoom-close');
+            if (!wrapper || wrapper.dataset.zoomBound === '1') return;
+
+            wrapper.dataset.zoomBound = '1';
+            wrapper.title = '双击放大/还原图表';
+
+            let backdrop = document.getElementById('phenology-zoom-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.id = 'phenology-zoom-backdrop';
+                backdrop.className = 'phenology-zoom-backdrop';
+                document.body.appendChild(backdrop);
+            }
+
+            const originalParent = wrapper.parentElement;
+            const placeholder = document.createElement('div');
+            placeholder.id = 'phenology-chart-placeholder';
+            placeholder.style.display = 'none';
+            placeholder.style.width = '100%';
+
+            const enterZoom = () => {
+                if (wrapper.classList.contains('is-zoomed')) return;
+
+                const computedHeight = window.getComputedStyle(wrapper).height;
+                placeholder.style.height = computedHeight;
+
+                if (originalParent && !placeholder.parentElement) {
+                    originalParent.insertBefore(placeholder, wrapper);
+                }
+                placeholder.style.display = 'block';
+
+                document.body.appendChild(wrapper);
+                wrapper.classList.add('is-zoomed');
+                document.body.classList.add('phenology-zoom-lock');
+                backdrop.classList.add('show');
+
+                if (window.phenologyChart && typeof window.phenologyChart.resize === 'function') {
+                    setTimeout(() => window.phenologyChart.resize(), 180);
+                }
+            };
+
+            const toggleZoom = (event) => {
+                event.preventDefault();
+                if (wrapper.classList.contains('is-zoomed')) {
+                    exitZoom();
+                } else {
+                    enterZoom();
+                }
+            };
+
+            const exitZoom = () => {
+                if (!wrapper.classList.contains('is-zoomed')) return;
+
+                wrapper.classList.remove('is-zoomed');
+                document.body.classList.remove('phenology-zoom-lock');
+                backdrop.classList.remove('show');
+
+                if (placeholder.parentElement && originalParent) {
+                    originalParent.insertBefore(wrapper, placeholder);
+                    placeholder.style.display = 'none';
+                }
+
+                if (window.phenologyChart && typeof window.phenologyChart.resize === 'function') {
+                    setTimeout(() => window.phenologyChart.resize(), 140);
+                }
+            };
+
+            wrapper.addEventListener('dblclick', toggleZoom);
+            backdrop.addEventListener('click', exitZoom);
+            if (closeBtn) {
+                closeBtn.addEventListener('click', exitZoom);
+            }
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    exitZoom();
+                }
+            });
+        }
+
+        function getAnalysisRegionCoordinates() {
+            const analysisRegionSelect = document.getElementById('analysis-region');
+            const targetText = (analysisRegionSelect && analysisRegionSelect.value) || '';
+
+            const coordMatch = targetText.match(/\(([-\d.]+)°E\s*,\s*([-\d.]+)°N\)/);
+            if (coordMatch) {
+                const lon = parseFloat(coordMatch[1]);
+                const lat = parseFloat(coordMatch[2]);
+                if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+                    return { lat, lng: lon, source: 'analysis-region-text' };
+                }
+            }
+
+            const regionCoordMap = {
+                '陕西洛川 (109.4°E, 35.8°N)': { lat: 35.8, lng: 109.4 },
+                '甘肃天水': { lat: 34.58, lng: 105.72 },
+                '山西运城': { lat: 35.02, lng: 110.99 },
+                '河南灵宝': { lat: 34.52, lng: 110.88 }
+            };
+
+            if (regionCoordMap[targetText]) {
+                return { ...regionCoordMap[targetText], source: 'analysis-region-map' };
+            }
+
+            return null;
+        }
+
+        function getPhenologyTargetCoordinates() {
+            const targetRegionInput = document.getElementById('target-region');
+            const analysisRegionSelect = document.getElementById('analysis-region');
+            const targetText = (targetRegionInput && targetRegionInput.value) || (analysisRegionSelect && analysisRegionSelect.value) || '';
+
+            const coordMatch = targetText.match(/\(([-\d.]+)°E\s*,\s*([-\d.]+)°N\)/);
+            if (coordMatch) {
+                const lon = parseFloat(coordMatch[1]);
+                const lat = parseFloat(coordMatch[2]);
+                if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+                    return { lat, lng: lon, source: 'target-region-text' };
+                }
+            }
+
+            const regionCoordMap = {
+                '陕西洛川 (109.4°E, 35.8°N)': { lat: 35.8, lng: 109.4 },
+                '甘肃天水': { lat: 34.58, lng: 105.72 },
+                '山西运城': { lat: 35.02, lng: 110.99 },
+                '河南灵宝': { lat: 34.52, lng: 110.88 }
+            };
+
+            if (regionCoordMap[targetText]) {
+                return { ...regionCoordMap[targetText], source: 'target-region-map' };
+            }
+
+            return null;
+        }
+        
+        // 重置按钮状态的辅助函数
+        function resetBtn(btn, radar, text, icon) {
+            if (!btn) return;
+            btn.innerHTML = `<i class="fa-solid fa-${icon}"></i> <span>${text}</span>`;
+            btn.classList.remove('opacity-80', 'cursor-not-allowed', 'bg-gray-600', 'glitch-effect');
+            btn.classList.add('bg-tech-green', 'hover:bg-emerald-600');
+            if (radar) radar.style.display = 'none';
+        }
+
+        // --- 3. 分析页面标签切换功能 ---
+
+        function switchAnalysisTab(tabName, event) {
+
+            // 隐藏所有标签内容
+
+            document.querySelectorAll('#ahp-tab, #phenology-tab').forEach(tab => {
+
+                tab.classList.add('hidden');
+
+            });
+
+            
+
+            // 移除所有标签的活跃状态
+
+            document.querySelectorAll('[onclick^="switchAnalysisTab"]').forEach(tab => {
+
+                tab.classList.remove('tab-active');
+
+                tab.classList.add('text-gray-400');
+
+                tab.classList.remove('text-white');
+
+            });
+
+            
+
+            // 显示选中的标签内容
+
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+
+            
+
+            // 设置选中标签为活跃状态
+
+            if (event && event.currentTarget) {
+
+                event.currentTarget.classList.add('tab-active');
+
+                event.currentTarget.classList.remove('text-gray-400');
+
+                event.currentTarget.classList.add('text-white');
+
+            }
+
+        }
+
+        
+
+
+        // --- 更新搜索半径显示 (从滑动条) ---
+        function updateRadiusValue(value) {
+            // 更新输入框值
+            document.getElementById('radius-input').value = value;
+        }
+
+        // --- 从输入框更新搜索半径 ---
+        function updateRadiusFromInput(value) {
+            // 确保值在有效范围内
+            let numValue = parseInt(value);
+            if (isNaN(numValue)) numValue = 50;
+            if (numValue < 0) numValue = 0;
+            if (numValue > 100) numValue = 100;
+            
+            // 更新输入框值
+            document.getElementById('radius-input').value = numValue;
+            
+            // 更新滑动条值
+            document.getElementById('search-radius').value = numValue;
+        }
+
+        // --- 更新相似度阈值显示 (从滑动条) ---
+        function updateSimilarityValue(value) {
+            // 更新输入框值
+            document.getElementById('similarity-input').value = value;
+        }
+
+        // --- 从输入框更新相似度阈值 ---
+        function updateSimilarityFromInput(value) {
+            // 确保值在有效范围内
+            let numValue = parseInt(value);
+            if (isNaN(numValue)) numValue = 60;
+            if (numValue < 0) numValue = 0;
+            if (numValue > 100) numValue = 100;
+            
+            // 更新输入框值
+            document.getElementById('similarity-input').value = numValue;
+            
+            // 更新滑动条值
+            document.getElementById('similarity-threshold').value = numValue;
+        }
+
+        // --- 更新分析半径显示 (从滑动条) ---
+        function updatePhenologyRadiusValue(value) {
+            // 更新输入框值
+            document.getElementById('phenology-radius-input').value = value;
+        }
+
+        // --- 从输入框更新分析半径 ---
+        function updatePhenologyRadiusFromInput(value) {
+            // 确保值在有效范围内
+            let numValue = parseInt(value);
+            if (isNaN(numValue)) numValue = 50;
+            if (numValue < 0) numValue = 0;
+            if (numValue > 100) numValue = 100;
+            
+            // 更新输入框值
+            document.getElementById('phenology-radius-input').value = numValue;
+            
+            // 更新滑动条值
+            document.getElementById('phenology-radius').value = numValue;
+        }
+
+        // --- 4. AHP 分析功能 (API Integrated) ---
+        async function runAHP() {
+            const btn = document.getElementById('ahp-btn');
+            const radar = document.getElementById('radar-layer');
+            
+            // 收集参数
+            const params = {};
+            
+            // 搜索半径
+            const radiusInput = document.getElementById('radius-input');
+            if(radiusInput) params.search_radius = parseInt(radiusInput.value);
+
+            const analysisCoords = getAnalysisRegionCoordinates();
+            const mapCenter = window.mainMap ? window.mainMap.getCenter() : { lat: 35.8, lng: 109.4 };
+            const centerLat = analysisCoords ? analysisCoords.lat : mapCenter.lat;
+            const centerLon = analysisCoords ? analysisCoords.lng : mapCenter.lng;
+            params.center_lat = centerLat;
+            params.center_lon = centerLon;
+            
+            // 权重参数 (如果需要)
+            const slopeInput = document.getElementById('w_slope');
+            if(slopeInput) params.w_slope = parseFloat(slopeInput.value);
+
+            // 添加故障效果
+            btn.classList.add('glitch-effect');
+            
+            // UI 状态变更：分析中
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>ANALYZING...</span>';
+            btn.classList.add('opacity-80', 'cursor-not-allowed');
+            radar.style.display = 'block'; // 显示雷达
+
+            try {
+                // 1. 启动任务
+                // Send params in body
+                const res = await fetch('/api/run/ahp', { 
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(params)
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Failed to start AHP');
+                }
+
+                // 2. 轮询状态
+                const poll = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch('/api/status');
+                        const statusData = await statusRes.json();
+                        const task = statusData.tasks.ahp;
+
+                        if (task.status === 'completed') {
+                            clearInterval(poll);
+                            finishAHP();
+                        } else if (task.status === 'failed') {
+                            clearInterval(poll);
+                            alert('AHP 分析失败: ' + task.error);
+                            resetBtn(btn, radar, '运行 AHP 分析', 'fa-play');
+                        }
+                    } catch (e) {
+                         console.error("Polling error", e);
+                    }
+                }, 2000);
+
+            } catch (e) {
+                alert('启动失败: ' + e.message);
+                resetBtn(btn, radar, '运行 AHP 分析', 'fa-play');
+            }
+        }
+
+        async function finishAHP() {
+            const btn = document.getElementById('ahp-btn');
+            const radar = document.getElementById('radar-layer');
+
+            // UI 状态变更：分析完成
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>分析完成</span>';
+            btn.classList.remove('bg-tech-green');
+            btn.classList.add('bg-gray-600'); // 按钮变灰
+            radar.style.display = 'none'; // 隐藏雷达
+
+            try {
+                // 3. 获取结果
+                const res = await fetch('/api/output/ahp_results.json');
+                if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+                const data = await res.json();
+                console.log("AHP Results:", data);
+
+                // 更新结果数据
+                if (document.getElementById('avg-score')) document.getElementById('avg-score').innerText = data.avg_score;
+                if (document.getElementById('s-class-count')) document.getElementById('s-class-count').innerText = data.s_class_count;
+                if (document.getElementById('a-class-count')) document.getElementById('a-class-count').innerText = data.a_class_count;
+                if (document.getElementById('b-class-count')) document.getElementById('b-class-count').innerText = data.b_class_count;
+                if (document.getElementById('c-class-count')) document.getElementById('c-class-count').innerText = data.c_class_count;
+                if (document.getElementById('d-class-count')) document.getElementById('d-class-count').innerText = data.d_class_count;
+                if (document.getElementById('total-count')) document.getElementById('total-count').innerText = data.total_count;
+                
+                // 更新图表
+                if (typeof updateSuitabilityChart === 'function') {
+                    updateSuitabilityChart(data.suitability_dist);
+                } else {
+                    console.error("updateSuitabilityChart function missing");
+                }
+                
+                // 在地图上添加标记
+                addAHPMarkers();
+                
+                playCompletionSound();
+            } catch (e) {
+                console.error("Failed to load results", e);
+                alert("分析完成但无法加载结果文件: " + e.message);
+            }
+        }
+
+        function resetBtn(btn, radar, text, icon) {
+            btn.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${text}</span>`;
+            btn.classList.remove('opacity-80', 'cursor-not-allowed', 'bg-gray-600');
+            btn.classList.add('bg-tech-green');
+            radar.style.display = 'none';
+        }
+
+
+
+
+
+        // --- 5. 物候期匹配功能 (API Integrated) ---
+        async function runPhenology() {
+            const btn = document.getElementById('phenology-btn');
+            const radar = document.getElementById('radar-layer');
+            const mapBtn = document.getElementById('phenology-map-btn');
+            const clearBtn = document.getElementById('phenology-map-clear-btn');
+            
+            // 添加故障效果
+            btn.classList.add('glitch-effect');
+            
+            // UI 状态变更：分析中
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>MATCHING...</span>';
+            btn.classList.add('opacity-80', 'cursor-not-allowed');
+            if(radar) radar.style.display = 'block'; // 显示雷达
+            if (mapBtn) {
+                mapBtn.disabled = true;
+                mapBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            if (clearBtn) {
+                clearBtn.disabled = true;
+                clearBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            clearPhenologyMarkers();
+            phenologySampledMatches = [];
+            phenologyLocalPoint = null;
+
+            try {
+                // 0. 检查服务端 GEE 可用性（不可用时提示数据不足）
+                try {
+                    const geeRes = await fetch('/api/gee-status');
+                    if (geeRes.ok) {
+                        const geeStatus = await geeRes.json();
+                        if (!geeStatus.gee_available) {
+                            alert('当前服务器无法访问 GEE，数据不足，将使用模拟数据进行匹配。');
+                        }
+                    }
+                } catch (_) {
+                    // 忽略状态检查失败，继续执行主流程
+                }
+
+                // 1. 获取选中的参考产区 ID
+                const referenceRegionSelect = document.getElementById('reference-region-select');
+                const selectedReferenceId = referenceRegionSelect ? referenceRegionSelect.value : null;
+                
+                // 2. 获取分析点：优先使用“目标产区”坐标，失败时回退地图中心
+                const targetCoords = getPhenologyTargetCoordinates();
+                const mapCenter = window.mainMap ? window.mainMap.getCenter() : { lat: 35.8, lng: 109.4 };
+                const lat = targetCoords ? targetCoords.lat : mapCenter.lat;
+                const lng = targetCoords ? targetCoords.lng : mapCenter.lng;
+                const coordSource = targetCoords ? targetCoords.source : 'map-center-fallback';
+                const samplePoints = parseInt(document.getElementById('phenology-sample-points')?.value || '20', 10);
+                const sampleResolution = parseInt(document.getElementById('phenology-sample-resolution')?.value || '1000', 10);
+                const topN = parseInt(document.getElementById('phenology-top-n')?.value || '5', 10);
+                const searchRadius = parseInt(document.getElementById('phenology-radius-input')?.value || '50', 10);
+                const year = parseInt(document.getElementById('phenology-year')?.value || '2020', 10);
+
+                console.log(`[物候匹配] 分析坐标: ${lat}°, ${lng}° (source: ${coordSource}), 参考产区ID: ${selectedReferenceId || '全部'}, 年份: ${year}`);
+                
+                // 3. 调用新的物候匹配 API
+                const matchRes = await fetch('/api/phenology-matching', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        lat: lat,
+                        lon: lng,
+                        golden_standard_id: selectedReferenceId || null,
+                        search_radius_km: searchRadius,
+                        sample_points: samplePoints,
+                        sample_resolution_m: sampleResolution,
+                        top_n: topN,
+                        year: year
+                    })
+                });
+                
+                if (!matchRes.ok) {
+                    const err = await matchRes.json();
+                    throw new Error(err.detail || '物候匹配失败');
+                }
+                
+                const matchResult = await matchRes.json();
+                console.log('[物候匹配] API 返回结果:', matchResult);
+
+                if (matchResult && matchResult.data_source === 'simulated') {
+                    alert('提示：本次匹配使用模拟数据，结果仅供参考。');
+                }
+                
+                // 4. 显示结果
+                displayMatchingResults(matchResult, btn, radar);
+                
+            } catch (e) {
+                console.error('[物候匹配] 错误:', e);
+                alert('物候匹配失败: ' + e.message);
+                resetBtn(btn, radar, '运行物候匹配', 'fa-play');
+            }
+        }
+        
+        function displayMatchingResults(matchResult, btn, radar) {
+            // 更新 UI 状态
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>匹配完成</span>';
+            btn.classList.remove('bg-tech-green');
+            btn.classList.add('bg-gray-600');
+            if(radar) radar.style.display = 'none';
+            
+            console.log('[物候匹配] displayMatchingResults 收到的结果:', matchResult);
+            
+            // 显示最佳匹配
+            const matches = matchResult.matches || [];
+            const sampledMatches = matchResult.sampled_matches || [];
+            console.log('[物候匹配] matches 数量:', matches.length);
+            console.log('[物候匹配] local_ndvi 长度:', matchResult.local_ndvi?.length, '数据样本:', matchResult.local_ndvi?.slice(0, 5));
+            console.log('[物候匹配] local_lst 长度:', matchResult.local_lst?.length, '数据样本:', matchResult.local_lst?.slice(0, 5));
+
+            phenologySampledMatches = sampledMatches;
+            phenologyLocalPoint = { lat: matchResult.local_lat, lng: matchResult.local_lon };
+            const mapBtn = document.getElementById('phenology-map-btn');
+            if (mapBtn) {
+                const hasPoints = sampledMatches.length > 0;
+                mapBtn.disabled = !hasPoints;
+                mapBtn.classList.toggle('opacity-50', !hasPoints);
+                mapBtn.classList.toggle('cursor-not-allowed', !hasPoints);
+            }
+            
+            if (matches.length > 0) {
+                const bestMatch = matches[0];
+                console.log('[物候匹配] 最佳匹配:', bestMatch);
+                
+                const scoreEl = document.getElementById('best-similarity');
+                if (scoreEl) scoreEl.textContent = bestMatch.similarity_score.toFixed(1) + '%';
+                
+                // 显示 Top 5 匹配结果表格
+                displayMatchesTable(matches);
+                
+                // 绘制曲线对比图表
+                if (matchResult.local_ndvi && matchResult.local_lst && Array.isArray(matchResult.local_ndvi) && Array.isArray(matchResult.local_lst)) {
+                    console.log('[物候匹配] 正在调用 drawPhenologyComparisonChart...');
+                    drawPhenologyComparisonChart(
+                        matchResult.local_ndvi,
+                        matchResult.local_lst,
+                        matchResult.best_golden_ndvi,
+                        matchResult.best_golden_lst,
+                        bestMatch
+                    );
+                } else {
+                    console.error('[物候匹配] 缺少或无效的曲线数据:', {
+                        local_ndvi: matchResult.local_ndvi,
+                        local_lst: matchResult.local_lst
+                    });
+                }
+            } else {
+                console.warn('[物候匹配] 没有匹配结果');
+            }
+            
+            // 3秒后恢复按钮
+            setTimeout(() => {
+                resetBtn(btn, radar, '运行物候匹配', 'fa-play');
+            }, 3000);
+        }
+        
+        function displayMatchesTable(matches) {
+            // 创建或更新匹配结果表格
+            let tableEl = document.getElementById('matches-table');
+            if (!tableEl) {
+                const container = document.querySelector('[id^=\"phenology\"]')?.parentElement;
+                if (container) {
+                    tableEl = document.createElement('div');
+                    tableEl.id = 'matches-table';
+                    tableEl.className = 'glass-panel p-4 rounded-lg mt-4';
+                    container.appendChild(tableEl);
+                }
+            }
+            
+            if (!tableEl) return;
+            
+            let html = `
+                <h4 class="text-sm font-bold text-white mb-3">🏆 Top 5 匹配结果</h4>
+                <table class="w-full text-xs text-gray-300">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-2">排名</th>
+                            <th class="text-left py-2">金标准模型</th>
+                            <th class="text-center py-2">相似度</th>
+                            <th class="text-center py-2">NDVI相关</th>
+                            <th class="text-center py-2">LST相关</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            matches.slice(0, 5).forEach((match, index) => {
+                const ndviColor = match.ndvi_correlation > 0.8 ? '#10b981' : '#f59e0b';
+                const lstColor = match.lst_correlation > 0.8 ? '#10b981' : '#f59e0b';
+                
+                html += `
+                    <tr class="border-b border-gray-700/50 hover:bg-white/5">
+                        <td class="py-2">
+                            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : (index+1)}
+                        </td>
+                        <td class="py-2">${match.golden_standard_name}</td>
+                        <td class="text-center py-2">
+                            <span style="color: #10b981; font-weight: bold;">${match.similarity_score.toFixed(1)}%</span>
+                        </td>
+                        <td class="text-center py-2">
+                            <span style="color: ${ndviColor};">${match.ndvi_correlation.toFixed(2)}</span>
+                        </td>
+                        <td class="text-center py-2">
+                            <span style="color: ${lstColor};">${match.lst_correlation.toFixed(2)}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `</tbody></table>`;
+            tableEl.innerHTML = html;
+        }
+        
+        function drawPhenologyComparisonChart(localNdvi, localLst, bestGoldenNdvi, bestGoldenLst, bestMatch) {
+            console.log('[物候图表] 开始绘制图表...');
+            console.log('[物候图表] localNdvi:', localNdvi?.length, 'localLst:', localLst?.length, 'bestGoldenNdvi:', bestGoldenNdvi?.length, 'bestGoldenLst:', bestGoldenLst?.length, 'bestMatch:', bestMatch);
+            
+            // 获取 canvas 元素
+            const canvas = document.getElementById('phenology-chart');
+            console.log('[物候图表] canvas 元素:', canvas);
+            if (!canvas) {
+                console.error('[物候图表] 找不到 canvas 元素 #phenology-chart');
+                return;
+            }
+            
+            // 使用 Chart.js 官方 API 获取并销毁现有图表
+            // Chart.getChart() 方法会返回给定 canvas 上的图表实例（Chart.js 3.x+）
+            try {
+                const existingChart = Chart.getChart('phenology-chart');
+                if (existingChart) {
+                    console.log('[物候图表] 发现现有图表，正在销毁...');
+                    existingChart.destroy();
+                    console.log('[物候图表] 现有图表已销毁');
+                }
+            } catch (e) {
+                console.warn('[物候图表] 获取或销毁现有图表时出错:', e);
+            }
+            
+            // 检查 Chart 库是否加载
+            if (typeof Chart === 'undefined') {
+                console.error('[物候图表] Chart.js 库未加载');
+                return;
+            }
+            
+            // 小延迟确保 canvas 完全释放后再创建新图表
+            setTimeout(() => {
+                console.log('[物候图表] 创建新图表...');
+                try {
+                    const datasets = [
+                        {
+                            label: '本地 NDVI (植被指数)',
+                            data: localNdvi,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '本地 LST (地表温度)',
+                            data: localLst,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y1'
+                        }
+                    ];
+
+                    if (Array.isArray(bestGoldenNdvi) && bestGoldenNdvi.length > 0) {
+                        datasets.push({
+                            label: `金标准 NDVI (${bestMatch.golden_standard_name})`,
+                            data: bestGoldenNdvi,
+                            borderColor: '#34d399',
+                            backgroundColor: 'rgba(52, 211, 153, 0.06)',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y'
+                        });
+                    }
+
+                    if (Array.isArray(bestGoldenLst) && bestGoldenLst.length > 0) {
+                        datasets.push({
+                            label: `金标准 LST (${bestMatch.golden_standard_name})`,
+                            data: bestGoldenLst,
+                            borderColor: '#fbbf24',
+                            backgroundColor: 'rgba(251, 191, 36, 0.06)',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y1'
+                        });
+                    }
+
+                    window.phenologyChart = new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: Array.from({length: 365}, (_, i) => i + 1),
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, labels: { color: '#999' } },
+                                title: { display: true, text: `最佳匹配: ${bestMatch.golden_standard_name} (${bestMatch.similarity_score.toFixed(1)}%)`, color: '#fff' }
+                            },
+                            scales: {
+                                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666' } },
+                                y: { position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#10b981' } },
+                                y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#f59e0b' } }
+                            }
+                        }
+                    });
+                    console.log('[物候图表] 图表创建成功');
+                } catch (e) {
+                    console.error('[物候图表] 创建图表出错:', e);
+                }
+            }, 100);
+        }
+
+        async function finishPhenology() {
+            const btn = document.getElementById('phenology-btn');
+            const radar = document.getElementById('radar-layer');
+
+            // UI 状态变更：分析完成
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>匹配完成</span>';
+            btn.classList.remove('bg-tech-green');
+            btn.classList.add('bg-gray-600'); // 按钮变灰
+            radar.style.display = 'none'; // 隐藏雷达
+
+            try {
+                // 3. 获取结果
+                const res = await fetch('/api/output/phenology_results.json');
+                const data = await res.json();
+
+                // 更新结果数据
+                document.getElementById('best-similarity').innerText = data.average_similarity + '%';
+                
+                // 更新图表
+                updatePhenologyChart(data);
+                
+                addPhenologyMarkers();
+                
+                playCompletionSound();
+            } catch (e) {
+                console.error("Failed to load results", e);
+                alert("匹配完成但无法加载结果文件。");
+            }
+        }
+
+
+
+
+        // --- 6. 折叠面板功能 ---        
+
+        function toggleCollapse(id) {
+
+            const content = document.getElementById(id);
+
+            const icon = document.getElementById(id + '-icon');
+
+            if (content) {
+
+                content.classList.toggle('hidden');
+
+                if (icon) {
+
+                    if (content.classList.contains('hidden')) {
+
+                        icon.classList.remove('rotate-180');
+
+                    } else {
+
+                        icon.classList.add('rotate-180');
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        // --- 7. 图表更新功能 ---
+
+        function updateSuitabilityChart() {
+
+            // Destroy existing chart if any, using Chart.js registry
+            const chartInstance = Chart.getChart("suitability-chart");
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('suitability-chart').getContext('2d');
+            // Remove manual window management if Chart.getChart is sufficient, but keep for safety if used elsewhere
+            if(window.suitChart) {
+                 window.suitChart.destroy();
+                 window.suitChart = null;
+            }
+
+            
+
+            window.suitChart = new Chart(ctx, {
+
+                type: 'bar',
+
+                data: {
+
+                    labels: ['S级 (90-100)', 'A级 (80-90)', 'B级 (70-80)', 'C级 (60-70)', 'D级 (<60)'],
+
+                    datasets: [{
+
+                        label: '地块数量',
+
+                        data: (typeof arguments[0] !== 'undefined') ? arguments[0] : [0,0,0,0,0],
+
+                        backgroundColor: [
+
+                            'rgba(16, 185, 129, 0.8)',
+
+                            'rgba(52, 211, 153, 0.8)',
+
+                            'rgba(163, 230, 53, 0.8)',
+
+                            'rgba(245, 158, 11, 0.8)',
+
+                            'rgba(239, 68, 68, 0.8)'
+
+                        ],
+
+                        borderColor: [
+
+                            'rgb(16, 185, 129)',
+
+                            'rgb(52, 211, 153)',
+
+                            'rgb(163, 230, 53)',
+
+                            'rgb(245, 158, 11)',
+
+                            'rgb(239, 68, 68)'
+
+                        ],
+
+                        borderWidth: 1
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)'
+
+                            }
+
+                        },
+
+                        x: {
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)',
+
+                                font: {
+
+                                    family: 'Fira Code',
+
+                                    size: 10
+
+                                }
+
+                            }
+
+                        }
+
+                    },
+
+                    plugins: {
+
+                        legend: {
+
+                            display: false
+
+                        }
+
+                    }
+
+                }
+
+            });
+
+        }
+
+
+
+        function updatePhenologyChart(apiData) {
+            
+            const chartInstance = Chart.getChart("phenology-chart");
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('phenology-chart').getContext('2d');
+            let labels, refData, tgtData;
+            if (apiData && apiData.ref_curve) {
+                labels = Array.from({length: apiData.ref_curve.length}, (_, i) => i + 1);
+                refData = apiData.ref_curve;
+                tgtData = apiData.warped_curve || apiData.tgt_curve;
+            } else {
+                const days = Array.from({length: 365}, (_, i) => i + 1);
+                labels = days;
+                refData = days.map(d=>0); tgtData = days.map(d=>0);
+            }
+            if(window.phenoChart) {
+                window.phenoChart.destroy();
+                window.phenoChart = null;
+            }
+    
+
+            
+
+            // 生成模拟数据
+
+            const days = Array.from({length: 365}, (_, i) => i + 1);
+
+            const referenceData = days.map(day => {
+
+                const t = (day - 180) / 180 * Math.PI;
+
+                return 0.3 + 0.6 * Math.sin(t) * Math.exp(-0.005 * Math.abs(day - 180));
+
+            });
+
+            
+
+            const targetData_unused = days.map(day => {
+
+                const t = (day - 190) / 180 * Math.PI;
+
+                return 0.25 + 0.65 * Math.sin(t) * Math.exp(-0.004 * Math.abs(day - 190));
+
+            });
+
+            
+
+            window.phenoChart = new Chart(ctx, {
+
+                type: 'line',
+
+                data: {
+
+                    labels: labels.filter((_, i) => i % 30 === 0),
+
+                    datasets: [{
+
+                        label: '参考产区 (洛川)',
+
+                        data: refData.filter((_, i) => i % 30 === 0),
+
+                        borderColor: 'rgb(59, 130, 246)',
+
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+
+                        borderWidth: 2,
+
+                        tension: 0.4,
+
+                        fill: true
+
+                    }, {
+
+                        label: '目标产区',
+
+                        data: tgtData.filter((_, i) => i % 30 === 0),
+
+                        borderColor: 'rgb(16, 185, 129)',
+
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+
+                        borderWidth: 2,
+
+                        tension: 0.4,
+
+                        fill: true
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            max: 1,
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)',
+
+                                font: {
+
+                                    family: 'Fira Code'
+
+                                }
+
+                            }
+
+                        },
+
+                        x: {
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)',
+
+                                font: {
+
+                                    family: 'Fira Code',
+
+                                    size: 10
+
+                                }
+
+                            }
+
+                        }
+
+                    },
+
+                    plugins: {
+
+                        legend: {
+
+                            labels: {
+
+                                color: 'rgba(255, 255, 255, 0.7)',
+
+                                font: {
+
+                                    family: 'Fira Sans',
+
+                                    size: 10
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            });
+
+        }
+
+
+
+        // --- 适宜性热力图 ---
+        async function showSuitabilityHeatmap() {
+            switchModule('scan-console');
+            if (!map) {
+                alert('地图未初始化');
+                return;
+            }
+
+            if (suitabilityHeatLayer) {
+                map.removeLayer(suitabilityHeatLayer);
+                suitabilityHeatLayer = null;
+            }
+
+            try {
+                const res = await fetch('/api/ahp/tiles');
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || '热力图尚未生成，请先运行 AHP 分析');
+                }
+                const data = await res.json();
+                const tileUrl = data.tile_url;
+                suitabilityHeatLayer = L.tileLayer(tileUrl, {
+                    opacity: 0.65,
+                    zIndex: 5
+                }).addTo(map);
+
+                if (Array.isArray(data.bounds) && data.bounds.length === 2) {
+                    map.fitBounds(data.bounds, { padding: [30, 30] });
+                }
+            } catch (e) {
+                alert(e.message || '热力图加载失败');
+            }
+        }
+
+        function hideSuitabilityHeatmap() {
+            if (suitabilityHeatLayer && map) {
+                map.removeLayer(suitabilityHeatLayer);
+            }
+            suitabilityHeatLayer = null;
+        }
+
+        async function showAHPClassPlots(grade) {
+            if (!map) {
+                alert('地图未初始化');
+                return;
+            }
+
+            switchModule('scan-console');
+
+            if (ahpClassPlotsLayer) {
+                map.removeLayer(ahpClassPlotsLayer);
+            }
+            ahpClassPlotsLayer = L.layerGroup().addTo(map);
+
+            const colorMap = {
+                S: '#a855f7',
+                A: '#10b981',
+                B: '#f59e0b',
+                C: '#fb923c',
+                D: '#ef4444'
+            };
+            const color = colorMap[grade] || '#38bdf8';
+
+            try {
+                const res = await fetch(`/api/ahp/class-plots?grade=${encodeURIComponent(grade)}&limit=180`);
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || '获取分级地块失败');
+                }
+                const data = await res.json();
+                const points = Array.isArray(data.points) ? data.points : [];
+
+                if (points.length === 0) {
+                    alert(`${grade}级暂无可视化地块`);
+                    return;
+                }
+
+                const boundsPts = [];
+                points.forEach(pt => {
+                    if (!Number.isFinite(pt.lat) || !Number.isFinite(pt.lon)) return;
+                    boundsPts.push([pt.lat, pt.lon]);
+                    L.circleMarker([pt.lat, pt.lon], {
+                        radius: 4,
+                        color,
+                        fillColor: color,
+                        fillOpacity: 0.55,
+                        weight: 1
+                    })
+                    .bindPopup(`<b>${grade}级地块</b><br>评分: ${pt.score ?? '--'}<br>${pt.lon.toFixed(4)}°E, ${pt.lat.toFixed(4)}°N`)
+                    .addTo(ahpClassPlotsLayer);
+                });
+
+                if (boundsPts.length > 0) {
+                    map.fitBounds(boundsPts, { padding: [30, 30] });
+                }
+            } catch (e) {
+                console.error('[AHP分级地块] 显示失败:', e);
+                alert('显示分级地块失败: ' + (e.message || e));
+            }
+        }
+
+        function clearAHPClassPlots() {
+            if (ahpClassPlotsLayer && map) {
+                map.removeLayer(ahpClassPlotsLayer);
+            }
+            ahpClassPlotsLayer = null;
+        }
+
+        // --- 7. 地图标记功能 ---
+
+        function addAHPMarkers() {
+
+            // S级地块标记由后端计算结果决定，不使用硬编码数据
+            console.log('[地图] AHP 标记已生成（S级地块来自统计数据）');
+
+        }
+
+
+
+        function addPhenologyMarkers() {
+
+            showPhenologySimilarityPlots();
+
+        }
+
+        function setPhenologyClearButtonState(enabled) {
+            const clearBtn = document.getElementById('phenology-map-clear-btn');
+            if (!clearBtn) return;
+            clearBtn.disabled = !enabled;
+            clearBtn.classList.toggle('opacity-50', !enabled);
+            clearBtn.classList.toggle('cursor-not-allowed', !enabled);
+        }
+
+        function clearPhenologyMarkers() {
+            if (phenologyMarkersLayer && map) {
+                map.removeLayer(phenologyMarkersLayer);
+            }
+            phenologyMarkersLayer = null;
+            setPhenologyClearButtonState(false);
+        }
+
+        function clearPhenologyMapOverlays() {
+            clearPhenologyMarkers();
+        }
+
+        function showPhenologySimilarityPlots() {
+            if (!map) {
+                alert('地图未初始化');
+                return;
+            }
+
+            if (!Array.isArray(phenologySampledMatches) || phenologySampledMatches.length === 0) {
+                alert('暂无可视化地块，请先运行物候匹配。');
+                return;
+            }
+
+            switchModule('scan-console');
+
+            clearPhenologyMarkers();
+            phenologyMarkersLayer = L.layerGroup().addTo(map);
+
+            const boundsPoints = [];
+
+            if (phenologyLocalPoint && Number.isFinite(phenologyLocalPoint.lat) && Number.isFinite(phenologyLocalPoint.lng)) {
+                boundsPoints.push([phenologyLocalPoint.lat, phenologyLocalPoint.lng]);
+                L.circleMarker([phenologyLocalPoint.lat, phenologyLocalPoint.lng], {
+                    radius: 7,
+                    color: '#10b981',
+                    fillColor: '#10b981',
+                    fillOpacity: 0.9,
+                    weight: 2
+                })
+                .bindPopup(`<div class="p-2"><b style="color:#10b981;">本地分析点</b><br><span style="font-size:12px;">${phenologyLocalPoint.lng.toFixed(4)}°E, ${phenologyLocalPoint.lat.toFixed(4)}°N</span></div>`)
+                .addTo(phenologyMarkersLayer);
+            }
+
+            phenologySampledMatches.forEach((plot, index) => {
+                const lat = Number(plot.lat);
+                const lon = Number(plot.lon);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+                boundsPoints.push([lat, lon]);
+                const isTop = index === 0;
+
+                L.circleMarker([lat, lon], {
+                    radius: isTop ? 8 : 6,
+                    color: isTop ? '#f59e0b' : '#fb923c',
+                    fillColor: isTop ? '#f59e0b' : '#fb923c',
+                    fillOpacity: 0.9,
+                    weight: 2
+                })
+                .bindPopup(
+                    `<div class="p-2">
+                        <b style="color:#f59e0b;">相似地块 #${index + 1}</b><br>
+                        <span style="font-size:12px;">相似度 ${Number(plot.similarity_score || 0).toFixed(1)}%</span><br>
+                        <span style="font-size:12px;">匹配金标准：${plot.matched_standard_name || '--'}</span><br>
+                        <span style="font-size:12px;">${lon.toFixed(4)}°E, ${lat.toFixed(4)}°N</span>
+                    </div>`
+                )
+                .addTo(phenologyMarkersLayer);
+            });
+
+            if (boundsPoints.length > 1) {
+                map.fitBounds(boundsPoints, { padding: [30, 30] });
+            } else if (boundsPoints.length === 1) {
+                map.setView(boundsPoints[0], 11);
+            }
+
+            setPhenologyClearButtonState(true);
+
+        }
+
+
+
+        // --- 8. 音效反馈功能 ---
+
+        function playCompletionSound() {
+
+            try {
+
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                const oscillator = audioContext.createOscillator();
+
+                const gainNode = audioContext.createGain();
+
+                
+
+                oscillator.connect(gainNode);
+
+                gainNode.connect(audioContext.destination);
+
+                
+
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+
+                oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.3);
+
+                
+
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                
+
+                oscillator.start(audioContext.currentTime);
+
+                oscillator.stop(audioContext.currentTime + 0.3);
+
+            } catch (e) {
+
+                // 音效不支持时静默失败
+
+            }
+
+        }
+
+        
+
+        // --- 9. 初始化默认图表 ---
+
+        function initCharts() {
+
+            // 初始化适宜性图表
+
+            const ctx1 = document.getElementById('suitability-chart').getContext('2d');
+
+            new Chart(ctx1, {
+
+                type: 'bar',
+
+                data: {
+
+                    labels: ['S级', 'A级', 'B级', 'C级', 'D级'],
+
+                    datasets: [{
+
+                        label: '地块数量',
+
+                        data: [0, 0, 0, 0, 0],
+
+                        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+
+                        borderColor: 'rgb(16, 185, 129)',
+
+                        borderWidth: 1
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)'
+
+                            }
+
+                        },
+
+                        x: {
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)'
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            });
+
+            
+
+            // 初始化物候期图表
+
+            const ctx2 = document.getElementById('phenology-chart').getContext('2d');
+
+            new Chart(ctx2, {
+
+                type: 'line',
+
+                data: {
+
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+
+                    datasets: [{
+
+                        label: '参考产区',
+
+                        data: Array(12).fill(0),
+
+                        borderColor: 'rgb(59, 130, 246)',
+
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+
+                        borderWidth: 2,
+
+                        tension: 0.4,
+
+                        fill: true
+
+                    }, {
+
+                        label: '目标产区',
+
+                        data: Array(12).fill(0),
+
+                        borderColor: 'rgb(16, 185, 129)',
+
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+
+                        borderWidth: 2,
+
+                        tension: 0.4,
+
+                        fill: true
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            max: 1,
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)'
+
+                            }
+
+                        },
+
+                        x: {
+
+                            grid: {
+
+                                color: 'rgba(255, 255, 255, 0.1)'
+
+                            },
+
+                            ticks: {
+
+                                color: 'rgba(255, 255, 255, 0.7)'
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            });
+
+        }
+
+        
+
+        // --- 10. 模拟时钟 ---
+
+        function updateClock() {
+
+            const now = new Date();
+
+            document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', { hour12: false });
+
+        }
+
+        setInterval(updateClock, 1000);
+
+        updateClock();
+
+
+
+        // --- 11. 扫描控制台选区逻辑 ---
+
+        
+
+        // 页面加载完成后初始化图表
+
+        window.onload = function() {
+
+            initCharts();
+            initPhenologyRegionSync();
+            initPhenologyChartZoom();
+            initScanRegionSelection();
+            initRegionSync();
+
+            // 添加地名搜索框的 Enter 键事件
+            const placeSearchInput = document.getElementById('place-search-input');
+            if (placeSearchInput) {
+                placeSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchPlaceByName();
+                    }
+                });
+            }
+
+            // 平均适宜性得分双击跳转热力图
+            const avgScoreEl = document.getElementById('avg-score');
+            if (avgScoreEl) {
+                avgScoreEl.title = '双击查看热力图';
+                avgScoreEl.classList.add('cursor-pointer');
+                avgScoreEl.addEventListener('dblclick', showSuitabilityHeatmap);
+            }
+
+        };
+
+    </script>
+
+</body>
+
+</html>
+
